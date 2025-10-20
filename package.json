@@ -1,0 +1,22 @@
+{
+  "name": "homemade-netflix",
+  "version": "1.0.0",
+  "description": "Homemade Netflix",
+  "main": "index.js",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/MarronFrui/ProjectM.git"
+  },
+  "scripts": {
+    "test": "test",
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite build"
+  },
+  "author": "Marron",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/MarronFrui/ProjectM/issues"
+  },
+  "homepage": "https://github.com/MarronFrui/ProjectM#readme"
+}
