@@ -1,5 +1,6 @@
 body {
     background-color: #1e1e1e;
+    color: grey;
     width: 100%;
     height: 100%;
     margin: 0;
@@ -17,6 +18,8 @@ header h1 {
     margin-left: auto;
 }
 
+
+/* Need to work again on search bar  */
 #search {
   border: 1px solid #ccc;
   transition: width 0.3s, padding 0.3s;
@@ -28,11 +31,20 @@ header h1 {
   padding: 5px;
 }
 
+/* Movie grid and card section  */
 #movie-grid {
     display: flex;
     justify-content: center;
 }
 
-#movie-card {
-    display: flex;
+#cards-container {
+  display: flex;
+  gap: 1rem;
+  padding: 1rem;
+}
+
+.card {
+  width: 100px;
+  height: 200px;
+  background-color: #ccc;
 }
