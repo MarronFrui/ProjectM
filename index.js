@@ -1,5 +1,7 @@
 //Move Cards
-const container = document.getElementById("cards-container");
+const container = document.getElementById("card-container");
+const leftArrowBtn = document.getElementById("scroll-btn-left")
+const rightArrowBtn = document.getElementById("scroll-btn-right")
 
 
 //Create 20 cards with unique IDs
@@ -11,10 +13,15 @@ for (let i = 1; i <= 20; i++) {
   container.appendChild(card);
 }
 
-container.children[0].focus();
-
 container.querySelectorAll(".card").forEach(card => {
   card.addEventListener("click", () => card.focus());
+});
+
+//Allow keyboard / remote arrows to move in the menu
+
+window.addEventListener('load', () => {
+  const firstCard = document.querySelector('#card-container .card');
+  if (firstCard) firstCard.focus();
 });
 
 document.addEventListener("keydown", (e) => {
@@ -31,4 +38,15 @@ document.addEventListener("keydown", (e) => {
     case "ArrowUp": next = currentFocus[idx-5]; break;
   }
   if(next) next.focus();
+});
+
+//Enable Arrow buttons
+leftArrowBtn.addEventListener('click', () => {
+  const event = new KeyboardEvent('keydown', { key: "ArrowLeft" });
+  document.dispatchEvent(event);
+});
+
+rightArrowBtn.addEventListener('click', () => {
+  const event = new KeyboardEvent('keydown', { key: "ArrowRight" });
+  document.dispatchEvent(event);
 });

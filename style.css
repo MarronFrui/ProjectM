@@ -9,6 +9,10 @@ header h1 {
     justify-content: center;
 }
 
+h2 {
+    margin-left: 4rem;
+}
+
 .search-bar {
     display: flex;
     width: 10rem;
@@ -20,6 +24,8 @@ header h1 {
     border: 1px solid #ccc;
     transition: width 0.3s, padding 0.3s;
     overflow: hidden;
+    margin-right: 4rem;
+    margin-bottom: 1rem;
 }
 
 #search.active {
@@ -36,6 +42,11 @@ header h1 {
   box-sizing: border-box;
 }
 
+.carousel-container {
+  overflow: hidden; 
+  position: relative;
+}
+
 /* Movie grid and card section  */
 #movie-grid {
     display: flex;
@@ -45,7 +56,7 @@ header h1 {
     overflow: hidden;
 }
 
-#cards-container {
+#card-container {
     display: flex;
     gap: 1rem;
     padding: 1rem 0;
@@ -54,6 +65,13 @@ header h1 {
     transform: translateX(0);
     transition: transform 0.4s ease;
     scroll-behavior: smooth;
+}
+
+.smaller-card-container {
+    margin-left: 5rem;
+    display: flex;
+    flex-direction:row;
+    gap: 3rem;
 }
 
 .card {
@@ -68,7 +86,18 @@ header h1 {
     outline: none;
 }
 
-.card:hover {
+.smaller-card {
+    width: 15rem;
+    height: 10rem;
+    border-radius: 2rem;
+    background-color: #ccc;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    cursor: pointer;
+    will-change: transform, box-shadow;
+    outline: none;
+}
+
+.card:hover, .smaller-card:hover {
     transform: scale(1.08);
     box-shadow: 0 8px 20px rgba(0, 0, 0, 0.5);
     z-index: 10;
@@ -76,23 +105,23 @@ header h1 {
 
 .scroll-btn-left {
     background-color: rgba(0, 0, 0, 0.6);
-    border: none;
     color: white;
     font-size: 2rem;
     cursor: pointer;
-    height: 30rem;
-    width: 3rem;
+    height: 5rem;
+    border-radius: 1rem;
+    border-color: aliceblue;
     z-index: 5;
 }
 
 .scroll-btn-right {
     background-color: rgba(0, 0, 0, 0.6);
-    border: none;
     color: white;
     font-size: 2rem;
     cursor: pointer;
-    height: 30rem;
-    width: 3rem;
+    height: 5rem;
+    border-radius: 1rem;
+    border-color: aliceblue;
     z-index: 5;
 }
 
@@ -104,9 +133,11 @@ header h1 {
     margin-left: 0.5rem;
 }
 
-.card:focus {
+.card:focus, .smaller-card:focus {
     outline: 3px solid #e50914;
     transform: scale(1.05);
     box-shadow: 0 10px 25px rgba(0, 0, 0, 0.6);
     z-index: 10;
+    overflow: visible;
 }
+
