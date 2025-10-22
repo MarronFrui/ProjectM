@@ -1,12 +1,11 @@
 // ======= Content Dataset =======
 const contentDB = new Array(50).fill(null).map((_, i) => ({
     id: `item-${i+1}`,
-    name: "Unknown",
+    name: `title ${i}`,
     category: ["Film", "Serie", "Documentaire"][i % 3],
-    available: true | false
+    available: Math.random() > 0.5 // placeholder
 }));
 
-// Wishlist stores only IDs
 let wishlist = [];
 
 // ======= DOM Elements =======
@@ -17,16 +16,14 @@ const categories = Array.from(document.querySelectorAll(".smaller-card"));
 const isCategoryPage = !!document.querySelector(".disponibility-container");
 const movieGrid = document.getElementById("movie-grid");
 
-if (isCategoryPage && movieGrid) {
-    movieGrid.style.height = "auto";    
-}
+if (isCategoryPage && movieGrid) movieGrid.style.height = "auto";
 
-// ======= Render Grid =======
+// ======= Render Cards =======
 function renderCards(cards, container) {
     if (!container) return;
     container.innerHTML = "";
 
-    cards.forEach((item, i) => {
+    cards.forEach(item => {
         const card = document.createElement("div");
         card.className = "card";
         card.tabIndex = 0;
@@ -46,162 +43,145 @@ function renderCards(cards, container) {
         title.style.margin = "0.5rem 0";
         card.appendChild(title);
 
-        // Wishlist button
         const likeBtn = document.createElement("button");
         likeBtn.textContent = wishlist.includes(item.id) ? "♥" : "♡";
-        likeBtn.addEventListener("click", (e) => {
+        likeBtn.addEventListener("click", e => {
             e.stopPropagation();
             if (!wishlist.includes(item.id)) wishlist.push(item.id);
             else wishlist = wishlist.filter(id => id !== item.id);
-            renderPage(); // re-render
+            renderPage();
+            assignRowColForNavigation(); 
         });
         card.appendChild(likeBtn);
 
         container.appendChild(card);
     });
-
-    assignRowCol(container);
 }
 
 // ======= Assign Row/Col for Arrow Navigation =======
-function assignRowCol(container) {
-    if (!container) return;
-    const cards = Array.from(container.children);
-    const rows = 2;
+function assignRowColForNavigation() {
+    if (searchBar) {
+        searchBar.dataset.row = 0;
+        searchBar.dataset.col = 0;
+    }
 
+    if (isCategoryPage) {
+        categories.forEach((btn, i) => {
+            btn.dataset.row = 1;
+            btn.dataset.col = i;
+        });
+    }
 
-    cards.forEach((card, i) => {
-        card.dataset.row = i % rows + 1;         // row 1 or 2
-        card.dataset.col = Math.floor(i / rows); // column index
-    });
+    const cardRows = 2;
+    let nextRow = isCategoryPage ? 2 : 1;
+
+    function assignCards(container) {
+        if (!container) return;
+        const cards = Array.from(container.children);
+        cards.forEach((card, i) => {
+            card.dataset.row = (i % cardRows) + nextRow;
+            card.dataset.col = Math.floor(i / cardRows);
+        });
+        nextRow += cardRows;
+    }
+
+    assignCards(containerAvailable);
+    assignCards(containerUnavailable);
 }
 
 // ======= Render Page =======
 function renderPage(filterCategory = null, filterSearch = "") {
     let filtered = contentDB;
 
-    // Filter category
     if (filterCategory) filtered = filtered.filter(item => item.category === filterCategory);
-
-    // Filter search
     if (filterSearch) filtered = filtered.filter(item => item.name.toLowerCase().includes(filterSearch.toLowerCase()));
 
-    // Available / Unavailable
-    const available = filtered.filter(item => item.available);
-    const unavailable = filtered.filter(item => !item.available);
+    if (isCategoryPage) {
+        const available = filtered.filter(item => item.available);
+        const unavailable = filtered.filter(item => !item.available);
+        renderCards(available, containerAvailable);
+        renderCards(unavailable, containerUnavailable);
+    } else {
+        const available = filtered.filter(item => item.available);
+        renderCards(available, containerAvailable);
+    }
 
-    // Render
-    renderCards(available, containerAvailable);
-    renderCards(unavailable, containerUnavailable);
+    assignRowColForNavigation();
 }
 
 // ======= Search Functionality =======
 if (searchBar) {
-    searchBar.addEventListener("input", (e) => {
-        renderPage(null, e.target.value);
-    });
+    searchBar.addEventListener("input", e => renderPage(null, e.target.value));
 }
 
 // ======= Category Clicks =======
 categories.forEach(btn => {
     const link = btn.querySelector("a");
     if (!link) return;
-    btn.addEventListener("click", () => {
-        window.location.href = link.getAttribute("href");
-    });
+    btn.addEventListener("click", () => window.location.href = link.getAttribute("href"));
 });
 
 // ======= Arrow Navigation =======
-function setupArrowNavigation() {
-    const allFocusable = [searchBar, ...Array.from(document.querySelectorAll(".card")), ...categories].filter(Boolean);
-    allFocusable.forEach((el, i) => {
-        if (!el.dataset) el.dataset = {};
-    });
-
-    searchBar.dataset.row = 0;
-    searchBar.dataset.col = 0;
-    const rows = 2;
-
-    document.querySelectorAll(".card").forEach((card, i) => {
-        card.dataset.row = i % rows + 1;
-        card.dataset.col = Math.floor(i / rows);
-    });
-
-    categories.forEach((btn, i) => {
-        btn.dataset.row = 3;
-        btn.dataset.col = i;
-    });
-        
-    if (isCategoryPage) {
-    // Flatten available + unavailable cards
-    const allCards = Array.from(document.querySelectorAll(".card-container .card"));
-
-    allCards.forEach((card, i) => {
-        card.dataset.row = (i % rows) + 1;            // 1 or 2
-        card.dataset.col = Math.floor(i / rows);      // column index
-    });
-
-    // Assign categories row after cards
-    categories.forEach((btn, i) => {
-        btn.dataset.row = 3;
-        btn.dataset.col = i;
-    });
-
-    if (searchBar) {
-        searchBar.dataset.row = 0;
-        searchBar.dataset.col = 0;
-    }
-}
-
-document.addEventListener("keydown", (e) => {
+document.addEventListener("keydown", e => {
     const focused = document.activeElement;
     if (!focused.dataset) return;
 
-    let row = parseInt(focused.dataset.row);
-    let col = parseInt(focused.dataset.col);
-    let next;
+    const row = parseInt(focused.dataset.row);
+    const col = parseInt(focused.dataset.col);
+    let next = null;
 
-    switch(e.key) {
+    function findClosest(targetRow, targetCol) {
+        let el = document.querySelector(`[data-row='${targetRow}'][data-col='${targetCol}']`);
+        if (el) return el;
+
+        const rowEls = Array.from(document.querySelectorAll(`[data-row='${targetRow}']`));
+        if (!rowEls.length) return null;
+
+        let closest = rowEls[0];
+        let minDist = Math.abs(parseInt(closest.dataset.col) - targetCol);
+        rowEls.forEach(r => {
+            const dist = Math.abs(parseInt(r.dataset.col) - targetCol);
+            if (dist < minDist) {
+                closest = r;
+                minDist = dist;
+            }
+        });
+        return closest;
+    }
+
+    switch (e.key) {
         case "ArrowUp":
-            next = document.querySelector(`[data-row='${row-1}'][data-col='${col}']`) 
-                || document.querySelector(`[data-row='${row-1}']`);
+            next = findClosest(row - 1, col);
             break;
         case "ArrowDown":
-            next = document.querySelector(`[data-row='${row+1}'][data-col='${col}']`) 
-                || document.querySelector(`[data-row='${row+1}']`);
+            next = findClosest(row + 1, col);
             break;
         case "ArrowLeft":
-            next = document.querySelector(`[data-row='${row}'][data-col='${col-1}']`) 
-                || document.querySelector(`[data-row='${row}'][data-col='0']`);
+            next = document.querySelector(`[data-row='${row}'][data-col='${col-1}']`) ||
+                   findClosest(row, 0);
             break;
         case "ArrowRight":
-            next = document.querySelector(`[data-row='${row}'][data-col='${col+1}']`) 
-                || document.querySelector(`[data-row='${row}'][data-col='0']`);
+            next = document.querySelector(`[data-row='${row}'][data-col='${col+1}']`) ||
+                   findClosest(row, 0);
             break;
-        case "Enter": // OK button on remote
-            if (focused && typeof focused.click === "function") {
-                focused.click(); // trigger click of the focused element
-            }
+        case "Enter":
+            if (typeof focused.click === "function") focused.click();
             break;
     }
 
-    if(next) {
+    if (next) {
         next.focus();
         e.preventDefault();
     }
 });
 
-    // Focus first card if nothing focused
-    window.addEventListener("keydown", (e) => {
-        if (document.activeElement === document.body) {
-            const firstCard = document.querySelector(".card");
-            if (firstCard) firstCard.focus();
-        }
-    }, { once: true });
-}
+// ======= Focus First Card =======
+window.addEventListener("keydown", e => {
+    if (document.activeElement === document.body) {
+        const firstCard = document.querySelector(".card");
+        if (firstCard) firstCard.focus();
+    }
+}, { once: true });
 
 // ======= Initialize =======
 renderPage();
-setupArrowNavigation();
-assignRowCol(containerAvailable)
-assignRowCol(containerUnavailable)
