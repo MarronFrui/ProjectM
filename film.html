@@ -3,10 +3,52 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Homemade Netflix | Film</title>
+  <title>Film - Homemade Netflix</title>
   <link rel="stylesheet" href="style.css" />
-    
-    <div class="search-container">
-      <input class="search-bar" type="text" id="search" placeholder="Search movies..." />
-    </div>
 </head>
+<body>
+  <header>
+    <a href="index.html" style="text-decoration: none; color: inherit;">
+        <h1>Homemade Netflix</h1>
+    </a>
+  </header>
+
+  <div class="search-container">
+    <input class="search-bar" type="text" id="search" placeholder="Search movies..." tabindex="0" />
+  </div>
+
+  <section class="categorie">
+    <h2>Categories</h2>
+    <div class="carousel-container">
+      <div class="smaller-card-container">
+        <div class="smaller-card" tabindex="0"><a href="index.html">Home</a></div>
+        <div class="smaller-card" tabindex="0"><a href="film.html">Film</a></div>
+        <div class="smaller-card" tabindex="0"><a href="serie.html">Série</a></div>
+        <div class="smaller-card" tabindex="0"><a href="documentaire.html">Documentaire</a></div>
+        <div class="smaller-card" tabindex="0"><a href="whishlist.html">Whishlist</a></div>
+      </div>
+    </div>
+  </section>
+
+  <main id="movie-grid">
+    <section class="disponibility-container">
+      <section class="available">
+        <h2>Available</h2>
+        <div class="card-container" id="available-cards"></div>
+      </section>
+      <section class="unavailable">
+        <h2>Unavailable</h2>
+        <div class="card-container" id="unavailable-cards"></div>
+      </section>
+    </section>
+  </main>
+
+
+
+  <script src="index.js"></script>
+  <script>
+    // Filter this page for category "Film"
+    renderPage("Film");
+  </script>
+</body>
+</html>
