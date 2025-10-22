@@ -55,32 +55,69 @@ window.addEventListener('load', () => {
 });
 
 // Arrow key navigation
-document.addEventListener("keydown", (e) => {
-    const cards = Array.from(container.children);
-    const focused = document.activeElement;
-    const idx = cards.indexOf(focused);
-    if (idx === -1 || !focused.classList.contains("card")) return;
+// Collect all interactive elements
+const searchBar = document.getElementById("search");
+const cards = Array.from(document.querySelectorAll("#card-container .card"));
+const categories = Array.from(document.querySelectorAll(".smaller-card"));
 
-    const rows = 2;
+// Assign row/col for navigation
+// Row 0: search bar
+searchBar.dataset.row = 0;
+searchBar.dataset.col = 0;
+
+// Rows 1-2: movie grid
+const rows = 2;
+cards.forEach((card, i) => {
+    card.dataset.row = Math.floor(i / cards.length * rows) + 1; // row 1 or 2
+    card.dataset.col = i; // column index
+});
+
+// Row 3: category buttons
+categories.forEach((btn, i) => {
+    btn.dataset.row = 3;
+    btn.dataset.col = i;
+});
+
+// Handle arrow key navigation
+document.addEventListener("keydown", (e) => {
+    const focused = document.activeElement;
+    if (!focused.dataset) return;
+
+    let row = parseInt(focused.dataset.row);
+    let col = parseInt(focused.dataset.col);
     let next;
 
     switch(e.key) {
-        case "ArrowRight":
-            next = cards[idx + rows];
-            break;
-        case "ArrowLeft":
-            next = cards[idx - rows]; 
+        case "ArrowUp":
+            next = document.querySelector(`[data-row='${row-1}'][data-col='${col}']`) 
+                || document.querySelector(`[data-row='${row-1}']`);
             break;
         case "ArrowDown":
-            next = (idx % rows === rows - 1) ? null : cards[idx + 1]; 
+            next = document.querySelector(`[data-row='${row+1}'][data-col='${col}']`) 
+                || document.querySelector(`[data-row='${row+1}']`);
             break;
-        case "ArrowUp":
-            next = (idx % rows === 0) ? null : cards[idx - 1]; 
+        case "ArrowLeft":
+            next = document.querySelector(`[data-row='${row}'][data-col='${col-1}']`) 
+                || document.querySelector(`[data-row='${row}'][data-col='0']`);
+            break;
+        case "ArrowRight":
+            next = document.querySelector(`[data-row='${row}'][data-col='${col+1}']`) 
+                || document.querySelector(`[data-row='${row}'][data-col='0']`);
             break;
     }
 
-    if(next) next.focus();
+    if(next) {
+        next.focus();
+        e.preventDefault(); // prevent page scrolling
+    }
 });
+
+// Focus first card by default if nothing is focused
+window.addEventListener("keydown", (e) => {
+    if (document.activeElement === document.body) {
+        cards[0]?.focus();
+    }
+}, { once: true });
 
 
 // Buttons simulate arrow keys
