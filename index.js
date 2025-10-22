@@ -4,7 +4,7 @@ const leftArrowBtn = document.getElementById("scroll-btn-left");
 const rightArrowBtn = document.getElementById("scroll-btn-right");
 
 // Placeholder dataset for testing
-const movies = new Array(20).fill(null).map(() => ({
+const movies = new Array(50).fill(null).map(() => ({
   name: null,
   image: null,
   description: null
@@ -23,8 +23,7 @@ movies.forEach((movie, i) => {
   img.alt = movie.name || "Default Movie";
   img.onerror = () => img.src = './content_info/images/default.jpg';
   img.style.width = "100%";
-  img.style.height = "85%";
-  img.style.borderRadius = "2rem 2rem 0 0";
+  img.style.height = "75%";
   img.style.objectFit = "cover";
 
   // Title
@@ -57,20 +56,32 @@ window.addEventListener('load', () => {
 
 // Arrow key navigation
 document.addEventListener("keydown", (e) => {
-  const cards = Array.from(container.children);
-  const focused = document.activeElement;
-  const idx = cards.indexOf(focused);
-  if (!focused.classList.contains("card")) return;
+    const cards = Array.from(container.children);
+    const focused = document.activeElement;
+    const idx = cards.indexOf(focused);
+    if (idx === -1 || !focused.classList.contains("card")) return;
 
-  let next;
-  switch(e.key) {
-    case "ArrowRight": next = cards[idx+1]; break;
-    case "ArrowLeft": next = cards[idx-1]; break;
-    case "ArrowDown": next = cards[idx+5]; break; // 5 cards per "row"
-    case "ArrowUp": next = cards[idx-5]; break;
-  }
-  if(next) next.focus();
+    const rows = 2;
+    let next;
+
+    switch(e.key) {
+        case "ArrowRight":
+            next = cards[idx + rows];
+            break;
+        case "ArrowLeft":
+            next = cards[idx - rows]; 
+            break;
+        case "ArrowDown":
+            next = (idx % rows === rows - 1) ? null : cards[idx + 1]; 
+            break;
+        case "ArrowUp":
+            next = (idx % rows === 0) ? null : cards[idx - 1]; 
+            break;
+    }
+
+    if(next) next.focus();
 });
+
 
 // Buttons simulate arrow keys
 leftArrowBtn.addEventListener('click', () => {

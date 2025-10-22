@@ -12,8 +12,9 @@
   <header>
     <h1>Homemade Netflix</h1>
   </header>
+
     <div class="search-container">
-      <input class="search-bar" type="text" id="search" placeholder="Search movies..." />
+      <input class="search-bar" type="text" id="search" placeholder="Search movies..." tabindex="0" />
     </div>
 
   <main id="movie-grid">
@@ -26,22 +27,18 @@
     </div>
   </main>
   
-  <section>
+  <section class="categorie">
     <h2>Categories</h2>
     <div class="carousel-container">
       <div class="smaller-card-container">
-        <div class="smaller-card" tabindex="0">Film</div>
-        <div class="smaller-card" tabindex="0">Série</div>
-        <div class="smaller-card" tabindex="0">Documentaire</div>
+        <div class="smaller-card" tabindex="0"><a href="film.html">Film</a></div>
+        <div class="smaller-card" tabindex="0"><a href="serie.html">Série</a></div>
+        <div class="smaller-card" tabindex="0"><a href="documentaire.html">Documentaire</a></div>
+        <div class="smaller-card" tabindex="0"><a href="whishlist.html">Whishlist</a></div>
       </div>
     </div>
   </section>
-  
-  <footer>
-    <p>Je veux rajouter tel film</p>
-    <a href="whishlist.html">Clique ici</a>
-  </footer>
-  
+   
   <script src="index.js"></script>
 </body>
 
