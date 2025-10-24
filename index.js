@@ -1,5 +1,5 @@
 // ======= Content Dataset =======
-const contentDB = new Array(50).fill(null).map((_, i) => ({
+const contentDB = new Array(200).fill(null).map((_, i) => ({
     id: `item-${i+1}`,
     name: `title ${i}`,
     category: ["Film", "Serie", "Documentaire"][i % 3],
@@ -23,6 +23,8 @@ function renderCards(cards, container) {
     if (!container) return;
     container.innerHTML = "";
 
+    const isUnavailable = container === containerUnavailable;
+
     cards.forEach(item => {
         const card = document.createElement("div");
         card.className = "card";
@@ -43,16 +45,18 @@ function renderCards(cards, container) {
         title.style.margin = "0.5rem 0";
         card.appendChild(title);
 
-        const likeBtn = document.createElement("button");
-        likeBtn.textContent = wishlist.includes(item.id) ? "♥" : "♡";
-        likeBtn.addEventListener("click", e => {
-            e.stopPropagation();
-            if (!wishlist.includes(item.id)) wishlist.push(item.id);
-            else wishlist = wishlist.filter(id => id !== item.id);
-            renderPage();
-            assignRowColForNavigation(); 
-        });
-        card.appendChild(likeBtn);
+        if (isUnavailable) {
+            const likeBtn = document.createElement("button");
+            likeBtn.textContent = wishlist.includes(item.id) ? "♥" : "♡";
+            likeBtn.addEventListener("click", e => {
+                e.stopPropagation();
+                if (!wishlist.includes(item.id)) wishlist.push(item.id);
+                else wishlist = wishlist.filter(id => id !== item.id);
+                renderPage();
+                assignRowColForNavigation(); 
+            });
+            card.appendChild(likeBtn);
+        }
 
         container.appendChild(card);
     });

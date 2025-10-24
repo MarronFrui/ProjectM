@@ -97,9 +97,9 @@ a {
 .smaller-card-container {
     margin-left: 5rem;
     display: flex;
-    padding: 1rem;
+    padding: 0.1rem;
     flex-direction: row;
-    gap: 3rem;
+    gap: 2rem;
     overflow: visible;
 }
 
@@ -122,8 +122,8 @@ a {
     align-items: center;
     justify-content: center;
     width: 10rem;
-    height: 7rem;
-    border-radius: 2rem;
+    height: 4rem;
+    border-radius: 1rem;
     background-color: grey;
     transition: transform 0.3s ease, box-shadow 0.3s ease;
     cursor: pointer;
@@ -198,7 +198,7 @@ a {
 
 .available h2,
 .unavailable h2 {
-    margin-left: 1rem;       /* optional: align titles nicely */
+    margin-left: 4rem;       /* optional: align titles nicely */
 }
 
 .card-container {
@@ -208,10 +208,8 @@ a {
     grid-auto-columns: 10rem;
     gap: 1rem;
     overflow-x: auto;
-    overflow-y: hidden;
     padding: 1rem;
     width: 100%;
-    flex: 1; /* allow grid to expand inside its parent section */
 }
 
 .card-container::-webkit-scrollbar {
