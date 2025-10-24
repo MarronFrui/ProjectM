@@ -65,11 +65,16 @@ function assignRowColForNavigation() {
         searchBar.dataset.col = 0;
     }
 
-    if (isCategoryPage) {
-        categories.forEach((btn, i) => {
-            btn.dataset.row = 1;
-            btn.dataset.col = i;
-        });
+        if (isCategoryPage) {
+    categories.forEach((btn, i) => {
+        btn.dataset.row = 1;
+        btn.dataset.col = i;
+    });
+    } else {
+    categories.forEach((btn, i) => {
+        btn.dataset.row = 3;
+        btn.dataset.col = i;
+    });
     }
 
     const cardRows = 2;
