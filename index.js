@@ -2,11 +2,13 @@
 const contentDB = new Array(200).fill(null).map((_, i) => ({
     id: `item-${i+1}`,
     name: `title ${i}`,
+    description: `Description of title ${i}. Lorem ipsum dolor sit amet, consectetur adipiscing elit.`,
     category: ["Film", "Serie", "Documentaire"][i % 3],
-    available: Math.random() > 0.5 // placeholder
+    available: Math.random() > 0.5,
+    duration: 80 + Math.floor(Math.random() * 101),
+    seasons: i % 3 === 1 ? 1 + Math.floor(Math.random() * 5) : null, // only for series
+    episodes: i % 3 === 1 ? 6 + Math.floor(Math.random() * 15) : null
 }));
-
-let wishlist = [];
 
 // ======= DOM Elements =======
 const containerAvailable = document.getElementById("available-cards") || document.getElementById("card-container");
@@ -15,6 +17,16 @@ const searchBar = document.getElementById("search");
 const categories = Array.from(document.querySelectorAll(".smaller-card"));
 const isCategoryPage = !!document.querySelector(".disponibility-container");
 const movieGrid = document.getElementById("movie-grid");
+const previewModal = document.getElementById("preview-modal");
+const previewName = document.getElementById("preview-name");
+const previewDescription = document.getElementById("preview-description");
+const previewDuration = document.getElementById("preview-duration");
+const previewSeasonsEpisodes = document.getElementById("preview-seasons-episodes");
+const playButton = document.getElementById("play-button");
+const closePreview = document.getElementById("close-preview");
+const previewImage = document.getElementById("preview-image");
+
+let wishlist = [];
 
 if (isCategoryPage && movieGrid) movieGrid.style.height = "auto";
 
@@ -130,6 +142,48 @@ function renderPage(filterCategory = null, filterSearch = "") {
     assignRowColForNavigation();
 }
 
+let lastFocusedElement = null;
+
+// ======= Preview Modal =======
+function openPreview(item) {
+    const card = document.querySelector(`.card[data-id='${item.id}']`);
+    if (card) {
+        const imgEl = card.querySelector("img");
+        previewImage.src = imgEl ? imgEl.src : './content_info/images/default.jpg';
+        previewImage.alt = item.name;
+    }
+
+    previewName.textContent = item.name;
+    previewDescription.textContent = item.description;
+    previewDuration.textContent = `Duration: ${item.duration} min`;
+    
+    if (item.category === "Serie") {
+        previewSeasonsEpisodes.textContent = `Seasons: ${item.seasons}, Episodes: ${item.episodes}`;
+    } else {
+        previewSeasonsEpisodes.textContent = "";
+    }
+
+    lastFocusedElement = document.activeElement; // save focus
+    document.body.classList.add("preview"); // lock scroll & interactions
+    previewModal.classList.add("active");
+    playButton.focus();
+}
+
+// ======= 5. Close modal button =======
+function closePreviewModal() {
+    previewModal.classList.remove("active");
+    document.body.classList.remove("preview"); // restore interaction
+    if (lastFocusedElement) lastFocusedElement.focus(); // restore previous focus
+}
+
+
+document.addEventListener("keydown", e => {
+    if (e.key === "Escape" || e.key === "Backspace") {
+        closePreviewModal();
+    }
+});
+
+
 // ======= Search Functionality =======
 if (searchBar) {
     searchBar.addEventListener("input", e => renderPage(null, e.target.value));
@@ -193,6 +247,91 @@ document.addEventListener("keydown", e => {
     if (next) {
         next.focus();
         e.preventDefault();
+    }
+});
+
+document.addEventListener("keydown", e => {
+    if (document.body.classList.contains("preview")) return; // skip background navigation
+
+    const focused = document.activeElement;
+    if (!focused.dataset) return;
+    
+    if (e.key === "Enter") {
+        const focused = document.activeElement;
+        if (focused && focused.classList.contains("card")) {
+            const itemId = focused.dataset.id;
+            const item = contentDB.find(i => i.id === itemId);
+            if (item) openPreview(item);
+        }
+    }
+});
+
+document.addEventListener("click", e => {
+        const focused = document.activeElement;
+        if (focused && focused.classList.contains("card")) {
+            const itemId = focused.dataset.id;
+            const item = contentDB.find(i => i.id === itemId);
+            if (item) openPreview(item);
+        }
+
+});
+
+previewModal.addEventListener("keydown", e => {
+    const focusable = Array.from(previewModal.querySelectorAll("button, [tabindex]:not([tabindex='-1'])"));
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    const focusedIndex = focusable.indexOf(document.activeElement);
+
+    switch (e.key) {
+        case "Tab":
+            if (e.shiftKey) {
+                if (document.activeElement === first) {
+                    e.preventDefault();
+                    last.focus();
+                }
+            } else {
+                if (document.activeElement === last) {
+                    e.preventDefault();
+                    first.focus();
+                }
+            }
+            break;
+
+        case "ArrowUp":
+            e.preventDefault();
+            if (focusedIndex > 0) focusable[focusedIndex - 1].focus();
+            break;
+        case "ArrowDown":
+            e.preventDefault();
+            if (focusedIndex < focusable.length - 1) focusable[focusedIndex + 1].focus();
+            break;
+
+        case "Enter":
+        case " ":
+            if (document.activeElement.tagName === "BUTTON") {
+                e.preventDefault(); // prevent Space scrolling
+                document.activeElement.click(); // triggers click on closePreview or any other button
+            }
+            break;
+
+        case "Escape":
+        case "Backspace":
+            closePreviewModal();
+            break;
+    }
+});
+
+
+playButton.addEventListener("click", () => {
+    const focused = document.activeElement;
+    if (focused && focused.classList.contains("card")) {
+        const itemId = focused.dataset.id;
+        const item = contentDB.find(i => i.id === itemId);
+        if (item) {
+            // Encode the title to make it URL-safe
+            const titleSlug = encodeURIComponent(item.name.replace(/\s+/g, '-'));
+            window.location.href = `http://127.0.0.1:5173/${titleSlug}`;
+        }
     }
 });
 
