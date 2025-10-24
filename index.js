@@ -24,6 +24,7 @@ function renderCards(cards, container) {
     container.innerHTML = "";
 
     const isUnavailable = container === containerUnavailable;
+    const isAvailable = container === containerAvailable;
 
     cards.forEach(item => {
         const card = document.createElement("div");
@@ -56,6 +57,17 @@ function renderCards(cards, container) {
                 assignRowColForNavigation(); 
             });
             card.appendChild(likeBtn);
+        }
+
+        if (isAvailable) {
+            const duration = document.createElement("p");
+            const randomDuration = 80 + Math.floor(Math.random() * 101);
+            duration.textContent = `Duration: ${randomDuration} min`;
+            duration.style.textAlign = "center";
+            duration.style.margin = "0.25rem 0";
+            duration.style.fontSize = "0.85rem";
+            duration.style.color = "#ccc";
+            card.appendChild(duration);
         }
 
         container.appendChild(card);
