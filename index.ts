@@ -14,7 +14,9 @@ const contentDB = new Array(200).fill(null).map((_, i) => ({
 const containerAvailable = document.getElementById("available-cards") || document.getElementById("card-container");
 const containerUnavailable = document.getElementById("unavailable-cards");
 const searchBar = document.getElementById("search");
-const categories = Array.from(document.querySelectorAll(".smaller-card"));
+const categories = Array.from(
+    document.querySelectorAll<HTMLDivElement>(".smaller-card")
+);
 const isCategoryPage = !!document.querySelector(".disponibility-container");
 const movieGrid = document.getElementById("movie-grid");
 const previewModal = document.getElementById("preview-modal");
@@ -26,12 +28,23 @@ const playButton = document.getElementById("play-button");
 const closePreview = document.getElementById("close-preview");
 const previewImage = document.getElementById("preview-image");
 
-let wishlist = [];
+export interface ContentItem {
+    id: string;
+    name: string;
+    description: string;
+    category: "Film" | "Serie" | "Documentaire";
+    available: boolean;
+    duration: number;
+    seasons: number | null;
+    episodes: number | null;
+}
+
+let wishlist: string[] = [];
 
 if (isCategoryPage && movieGrid) movieGrid.style.height = "auto";
 
 // ======= Render Cards =======
-function renderCards(cards, container) {
+function renderCards(cards: ContentItem[], container: HTMLElement): void {
     if (!container) return;
     container.innerHTML = "";
 
@@ -66,7 +79,7 @@ function renderCards(cards, container) {
                 if (!wishlist.includes(item.id)) wishlist.push(item.id);
                 else wishlist = wishlist.filter(id => id !== item.id);
                 renderPage();
-                assignRowColForNavigation(); 
+                assignRowCol(); 
             });
             card.appendChild(likeBtn);
         }
@@ -87,34 +100,39 @@ function renderCards(cards, container) {
 }
 
 // ======= Assign Row/Col for Arrow Navigation =======
-function assignRowColForNavigation() {
+function assignRowCol() {
     if (searchBar) {
-        searchBar.dataset.row = 0;
-        searchBar.dataset.col = 0;
+        searchBar.dataset.row = "0";
+        searchBar.dataset.col = "0";
     }
 
         if (isCategoryPage) {
     categories.forEach((btn, i) => {
-        btn.dataset.row = 1;
-        btn.dataset.col = i;
+        btn.dataset.row = "1";
+        btn.dataset.col = `${i}`;
     });
     } else {
     categories.forEach((btn, i) => {
-        btn.dataset.row = 3;
-        btn.dataset.col = i;
+        btn.dataset.row = "3";
+        btn.dataset.col = `${i}`;
     });
     }
 
-    const cardRows = 2;
-    let nextRow = isCategoryPage ? 2 : 1;
+    const cardRows: number = 2;
+    let nextRow: number = isCategoryPage ? 2 : 1;
 
-    function assignCards(container) {
-        if (!container) return;
-        const cards = Array.from(container.children);
+    function assignCards(container: HTMLElement): void {
+        if (typeof container === null) {
+            return
+        } 
+
+        const cards = Array.from(container.children).filter((el): el is HTMLDivElement => el.tagName === "DIV"); // Make sure all cards are div
+
         cards.forEach((card, i) => {
-            card.dataset.row = (i % cardRows) + nextRow;
-            card.dataset.col = Math.floor(i / cardRows);
+            card.dataset.row = `${(i % cardRows) + nextRow}`;
+            card.dataset.col = `${Math.floor(i / cardRows)}`;
         });
+
         nextRow += cardRows;
     }
 
@@ -139,7 +157,7 @@ function renderPage(filterCategory = null, filterSearch = "") {
         renderCards(available, containerAvailable);
     }
 
-    assignRowColForNavigation();
+    assignRowCol();
 }
 
 let lastFocusedElement = null;
