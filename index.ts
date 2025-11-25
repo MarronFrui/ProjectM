@@ -27,7 +27,8 @@ const previewDescription = document.getElementById("preview-description")!;
 const previewDuration = document.getElementById("preview-duration")!;
 const previewSeasonsEpisodes = document.getElementById("preview-seasons-episodes")!;
 const playButton = document.getElementById("play-button")!;
-const closePreview = document.getElementById("close-preview")!;
+const closePreviewButton = document.getElementById("close-preview")!;
+let lastFocusedElement: FocusableElement | null;
 
 
 export interface ContentItem {
@@ -47,14 +48,14 @@ let wishlist: string[] = [];
 
 if (isCategoryPage && movieGrid) movieGrid.style.height = "auto";
 
-// ======= Render Cards =======
+
 function renderCards(cards: ContentItem[], container: HTMLElement): void {
     if (!container) return;
     container.innerHTML = "";
 
     const isUnavailable = container === containerUnavailable;
     const isAvailable = container === containerAvailable;
-
+    
     cards.forEach(item => {
         const card = document.createElement("div");
         card.className = "card";
@@ -74,6 +75,10 @@ function renderCards(cards: ContentItem[], container: HTMLElement): void {
         title.style.textAlign = "center";
         title.style.margin = "0.5rem 0";
         card.appendChild(title);
+
+        card.addEventListener("click", () => {
+            openPreviewModal(item);
+        });
 
         if (isUnavailable) {
             const likeBtn = document.createElement("button");
@@ -103,7 +108,6 @@ function renderCards(cards: ContentItem[], container: HTMLElement): void {
     });
 }
 
-// ======= Assign Row/Col for Arrow Navigation =======
 function assignRowCol() {
     if (searchBar) {
         searchBar.dataset.row = "0";
@@ -142,7 +146,7 @@ function assignRowCol() {
     assignCards(containerUnavailable);
 }
 
-// ======= Render Page =======
+
 function renderPage(filterCategory: ContentItem["category"] | null = null, filterSearch = "") {
     let filtered = contentDB;
 
@@ -175,49 +179,6 @@ if (isCategoryPage) {
 }
 
 
-let lastFocusedElement: any = null;
-
-// ======= Preview Modal =======
-function openPreview(item: ContentItem) {
-    const card = document.querySelector(`.card[data-id='${item.id}']`);
-    if (card) {
-        const imgEl = card.querySelector("img");
-        previewImage.src = imgEl ? imgEl.src : './content_info/images/default.jpg';
-        previewImage.alt = item.name;
-    }
-
-    previewName.textContent = item.name;
-    previewDescription.textContent = item.description;
-    previewDuration.textContent = `Duration: ${item.duration} min`;
-    
-    if (item.category === "Serie") {
-        previewSeasonsEpisodes.textContent = `Seasons: ${item.seasons}, Episodes: ${item.episodes}`;
-    } else {
-        previewSeasonsEpisodes.textContent = "";
-    }
-
-    lastFocusedElement = document.activeElement; // save focus
-    document.body.classList.add("preview"); // lock scroll & interactions
-    previewModal.classList.add("active");
-    playButton.focus();
-}
-
-// ======= 5. Close modal button =======
-function closePreviewModal() {
-    previewModal.classList.remove("active");
-    document.body.classList.remove("preview"); // restore interaction
-    if (lastFocusedElement) lastFocusedElement.focus(); // restore previous focus
-}
-
-
-document.addEventListener("keydown", e => {
-    if (e.key === "Escape" || e.key === "Backspace") {
-        closePreviewModal();
-    }
-});
-
-
-// ======= Search Functionality =======
 function search(): void {
     if (!searchBar){
         return
@@ -230,8 +191,6 @@ function search(): void {
 
 }
 
-
-// ======= Arrow Navigation =======
 function navigation(): void {
 
     function getFocused(): FocusableElement | null {
@@ -239,75 +198,184 @@ function navigation(): void {
         return el instanceof HTMLElement ? el : null;
     }
 
-    document.addEventListener("keydown", e => {
-        const focused: FocusableElement | null = getFocused();
-        if (!focused) return;
-        if (!focused.dataset.row || !focused.dataset.col) return;
+document.addEventListener("keydown", e => {
+    const focused = getFocused();
+    if (!focused) return;
 
-        const row = parseInt(focused.dataset.row);
-        const col = parseInt(focused.dataset.col);
-        let next: FocusableElement | null = null;
-
-        function findClosest(targetRow: number, targetCol: number): FocusableElement | null {
-            let el = document.querySelector<FocusableElement>(`[data-row='${targetRow}'][data-col='${targetCol}']`);
-            if (el) return el;
-
-            const rowEls = Array.from(document.querySelectorAll<FocusableElement>(`[data-row='${targetRow}']`));
-            if (!rowEls.length) return null;
-
-            let closest: FocusableElement = rowEls[0];
-            let minDist: number = Number.MAX_SAFE_INTEGER;
-
-            rowEls.forEach(r => {
-                const dist = Math.abs(parseInt(r.dataset.col ?? "0") - targetCol);
-                if (dist < minDist) {
-                    closest = r;
-                    minDist = dist;
-                }
-            });
-
-            return closest;
-        }
+    // --- MODAL NAVIGATION ---
+    if (previewModal.classList.contains("active")) {
+        const focusables = getFocusableInModal();
+        const currentIndex = focusables.indexOf(focused);
+        let nextIndex = currentIndex;
 
         switch (e.key) {
-            case "ArrowUp":
-                next = findClosest(row - 1, col);
-                break;
+            case "ArrowRight":
             case "ArrowDown":
-                next = findClosest(row + 1, col);
+                nextIndex = (currentIndex + 1) % focusables.length;
                 break;
             case "ArrowLeft":
-                next = document.querySelector<FocusableElement>(`[data-row='${row}'][data-col='${col - 1}']`) ||
-                       findClosest(row, 0);
-                break;
-            case "ArrowRight":
-                next = document.querySelector<FocusableElement>(`[data-row='${row}'][data-col='${col + 1}']`) ||
-                       findClosest(row, 0);
+            case "ArrowUp":
+                nextIndex = (currentIndex - 1 + focusables.length) % focusables.length;
                 break;
             case "Enter":
-                if (typeof focused.click === "function") focused.click();
+            case "OK": // TV remote
+                focused.click();
+                if (closePreviewButton) {
+                    closePreviewButton.addEventListener("click", () => {
+                        closePreviewModal();
+                    });
+                }
+                if (focused === playButton) {
+                    const itemName = previewName.textContent;
+                    const slug = encodeURIComponent(itemName!);
+                    window.location.href = `title/${slug}.html`;
+                }
                 break;
+            case "Escape":
+            case "Back":
+                closePreviewModal();
+                break;
+            default:
+                return; 
         }
 
-        if (next) {
+        e.preventDefault();
+        focusables[nextIndex].focus();
+        return; 
+    }
+
+
+    const row = parseInt(focused.dataset.row!);
+    const col = parseInt(focused.dataset.col!);
+    let next: FocusableElement | null = null;
+
+    function findClosest(targetRow: number, targetCol: number): FocusableElement | null {
+        let el = document.querySelector<FocusableElement>(
+            `[data-row='${targetRow}'][data-col='${targetCol}']`
+        );
+        if (el) return el;
+
+        const rowEls = Array.from(
+            document.querySelectorAll<FocusableElement>(`[data-row='${targetRow}']`)
+        );
+        if (!rowEls.length) return null;
+
+        let closest: FocusableElement = rowEls[0];
+        let minDist = Number.MAX_SAFE_INTEGER;
+
+        rowEls.forEach(r => {
+            const dist = Math.abs(parseInt(r.dataset.col ?? "0") - targetCol);
+            if (dist < minDist) {
+                closest = r;
+                minDist = dist;
+            }
+        });
+
+        return closest;
+    }
+
+    switch (e.key) {
+        case "ArrowUp":
+            next = findClosest(row - 1, col);
+            break;
+        case "ArrowDown":
+            next = findClosest(row + 1, col);
+            break;
+        case "ArrowLeft":
+            next = document.querySelector<FocusableElement>(
+                `[data-row='${row}'][data-col='${col - 1}']`
+            ) || findClosest(row, 0);
+            break;
+        case "ArrowRight":
+            next = document.querySelector<FocusableElement>(
+                `[data-row='${row}'][data-col='${col + 1}']`
+            ) || findClosest(row, 0);
+            break;
+        case "Enter":
+            if (focused.classList.contains("card")) {
+                const itemId = focused.dataset.id!;
+                const item = contentDB.find(c => c.id === itemId);
+                if (item) openPreviewModal(item);
+            } else if (focused.classList.contains("smaller-card")) {
+                const link = focused.querySelector<HTMLAnchorElement>("a");
+                if (link) link.click();
+            }
             e.preventDefault();
-            next.focus();
-        }
-    });
+            break;
+        case "Escape":
+        case "Backquote":
+            closePreviewModal();
+            break;
+    }
 
-
+    if (next) {
+        e.preventDefault();
+        next.focus();
+    }
+});
 }
 
+function closePreviewModal() {
+    previewModal.classList.remove("active");
+    document.body.classList.remove("preview"); 
+    if (lastFocusedElement) lastFocusedElement.focus(); 
+}
 
-// ======= Focus First Card =======
+function openPreviewModal(item: ContentItem) {
+const card = document.querySelector(`.card[data-id='${item.id}']`);
+if (card) {
+    const imgEl = card.querySelector("img");
+    previewImage.src = imgEl ? imgEl.src : './content_info/images/default.jpg';
+    previewImage.alt = item.name;
+}
+
+previewName.textContent = item.name;
+previewDescription.textContent = item.description;
+previewDuration.textContent = `Duration: ${item.duration} min`;
+
+if (item.category === "Serie") {
+    previewSeasonsEpisodes.textContent = `Seasons: ${item.seasons}, Episodes: ${item.episodes}`;
+} else {
+    previewSeasonsEpisodes.textContent = "";
+}
+
+lastFocusedElement = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+document.body.classList.add("preview"); 
+previewModal.classList.add("active");
+playButton.focus();
+}
+
+function getFocusableInModal(): FocusableElement[] {
+    if (!previewModal) return [];
+    return Array.from(
+        previewModal.querySelectorAll<FocusableElement>(
+            "button, [href], input, select, textarea, [tabindex]:not([tabindex='-1'])"
+        )
+    ).filter(el => !el.hasAttribute("disabled"));
+}
+
 window.addEventListener("keydown", e => {
     if (document.activeElement === document.body) {
-        const firstCard = document.querySelector<FocusableElement>(".card");
-        if (firstCard) firstCard.focus();
+        const firstFocusable = Array.from(document.querySelectorAll<FocusableElement>('[tabindex="0"]'))
+            .find(el => el.id !== "search");
+        if (firstFocusable) firstFocusable.focus();
     }
 }, { once: true });
 
-// ======= Initialize =======
+closePreviewButton.addEventListener("click", () => {
+    closePreviewModal();
+});
+
+playButton.addEventListener("click", () => {
+    if (!lastFocusedElement) return;
+    const itemName = previewName.textContent;
+    if (!itemName) return;
+
+    const slug = encodeURIComponent(itemName);
+    window.location.href = `title/${slug}.html`;
+});
+
+
 function init() {
     assignRowCol();
     renderPage();
