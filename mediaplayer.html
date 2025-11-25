@@ -10,14 +10,18 @@
   <header>
     <a href="index.html"><h1>Homemade Netflix</h1></a>
   </header>
-  <main>
-    <h2 id="movie-title"></h2>
-  </main>
+  
+<main>
+  <h2 id="movie-title"></h2>
 
-  <script>
-    const path = window.location.pathname;
-    const title = decodeURIComponent(path.split("/").pop().replace(".html", ""));
-    document.getElementById("movie-title").textContent = title;
-  </script>
+  <div id="season-selector"></div>
+  <div id="episode-selector"></div>
+  <div id="media-container"></div>
+  <video id="player" controls width="800">
+    Your browser does not support the video tag.
+  </video>
+</main>
+
+  <script type="module" src="mediaplayer.ts"></script>
 </body>
 </html>
