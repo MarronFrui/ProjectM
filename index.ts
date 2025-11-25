@@ -1,14 +1,15 @@
 // ======= Content Dataset =======
-const contentDB = new Array(200).fill(null).map((_, i) => ({
+const contentDB: ContentItem[] = new Array(200).fill(null).map((_, i): ContentItem => ({
     id: `item-${i+1}`,
     name: `title ${i}`,
     description: `Description of title ${i}. Lorem ipsum dolor sit amet, consectetur adipiscing elit.`,
-    category: ["Film", "Serie", "Documentaire"][i % 3],
+    category: ["Film", "Serie", "Documentaire"][i % 3] as ContentItem["category"],
     available: Math.random() > 0.5,
     duration: 80 + Math.floor(Math.random() * 101),
-    seasons: i % 3 === 1 ? 1 + Math.floor(Math.random() * 5) : null, // only for series
+    seasons: i % 3 === 1 ? 1 + Math.floor(Math.random() * 5) : null,
     episodes: i % 3 === 1 ? 6 + Math.floor(Math.random() * 15) : null
 }));
+
 
 // ======= DOM Elements =======
 const containerAvailable = document.getElementById("available-cards") || document.getElementById("card-container");
@@ -19,14 +20,15 @@ const categories = Array.from(
 );
 const isCategoryPage = !!document.querySelector(".disponibility-container");
 const movieGrid = document.getElementById("movie-grid");
-const previewModal = document.getElementById("preview-modal");
-const previewName = document.getElementById("preview-name");
-const previewDescription = document.getElementById("preview-description");
-const previewDuration = document.getElementById("preview-duration");
-const previewSeasonsEpisodes = document.getElementById("preview-seasons-episodes");
-const playButton = document.getElementById("play-button");
-const closePreview = document.getElementById("close-preview");
-const previewImage = document.getElementById("preview-image");
+const previewModal = document.getElementById("preview-modal")!;
+const previewName = document.getElementById("preview-name")!;
+const previewImage = document.getElementById("preview-image") as HTMLImageElement;
+const previewDescription = document.getElementById("preview-description")!;
+const previewDuration = document.getElementById("preview-duration")!;
+const previewSeasonsEpisodes = document.getElementById("preview-seasons-episodes")!;
+const playButton = document.getElementById("play-button")!;
+const closePreview = document.getElementById("close-preview")!;
+
 
 export interface ContentItem {
     id: string;
@@ -38,6 +40,8 @@ export interface ContentItem {
     seasons: number | null;
     episodes: number | null;
 }
+
+type FocusableElement = HTMLElement;
 
 let wishlist: string[] = [];
 
@@ -121,11 +125,9 @@ function assignRowCol() {
     const cardRows: number = 2;
     let nextRow: number = isCategoryPage ? 2 : 1;
 
-    function assignCards(container: HTMLElement): void {
-        if (typeof container === null) {
-            return
-        } 
-
+    function assignCards(container: HTMLElement | null): void {
+        if (container === null) return;
+        
         const cards = Array.from(container.children).filter((el): el is HTMLDivElement => el.tagName === "DIV"); // Make sure all cards are div
 
         cards.forEach((card, i) => {
@@ -141,29 +143,42 @@ function assignRowCol() {
 }
 
 // ======= Render Page =======
-function renderPage(filterCategory = null, filterSearch = "") {
+function renderPage(filterCategory: ContentItem["category"] | null = null, filterSearch = "") {
     let filtered = contentDB;
 
-    if (filterCategory) filtered = filtered.filter(item => item.category === filterCategory);
-    if (filterSearch) filtered = filtered.filter(item => item.name.toLowerCase().includes(filterSearch.toLowerCase()));
+    if (filterCategory) {
+        filtered = filtered.filter(item => item.category === filterCategory);
+    }
 
-    if (isCategoryPage) {
-        const available = filtered.filter(item => item.available);
-        const unavailable = filtered.filter(item => !item.available);
+    if (filterSearch) {
+        filtered = filtered.filter(item =>
+            item.name.toLowerCase().includes(filterSearch.toLowerCase())
+        );
+    }
+
+    const available = filtered.filter(item => item.available);
+    const unavailable = filtered.filter(item => !item.available);
+
+if (isCategoryPage) {
+    if (containerAvailable && containerUnavailable) {
         renderCards(available, containerAvailable);
         renderCards(unavailable, containerUnavailable);
-    } else {
-        const available = filtered.filter(item => item.available);
+    }
+} else {
+    if (containerAvailable) {
         renderCards(available, containerAvailable);
     }
+}
+
 
     assignRowCol();
 }
 
-let lastFocusedElement = null;
+
+let lastFocusedElement: any = null;
 
 // ======= Preview Modal =======
-function openPreview(item) {
+function openPreview(item: ContentItem) {
     const card = document.querySelector(`.card[data-id='${item.id}']`);
     if (card) {
         const imgEl = card.querySelector("img");
@@ -203,163 +218,101 @@ document.addEventListener("keydown", e => {
 
 
 // ======= Search Functionality =======
-if (searchBar) {
-    searchBar.addEventListener("input", e => renderPage(null, e.target.value));
+function search(): void {
+    if (!searchBar){
+        return
+    }
+    searchBar.addEventListener("input", e => {
+        if (e.target instanceof HTMLInputElement) {
+            renderPage(null, e.target.value);
+        }
+    });
+
 }
 
-// ======= Category Clicks =======
-categories.forEach(btn => {
-    const link = btn.querySelector("a");
-    if (!link) return;
-    btn.addEventListener("click", () => window.location.href = link.getAttribute("href"));
-});
 
 // ======= Arrow Navigation =======
-document.addEventListener("keydown", e => {
-    const focused = document.activeElement;
-    if (!focused.dataset) return;
+function navigation(): void {
 
-    const row = parseInt(focused.dataset.row);
-    const col = parseInt(focused.dataset.col);
-    let next = null;
-
-    function findClosest(targetRow, targetCol) {
-        let el = document.querySelector(`[data-row='${targetRow}'][data-col='${targetCol}']`);
-        if (el) return el;
-
-        const rowEls = Array.from(document.querySelectorAll(`[data-row='${targetRow}']`));
-        if (!rowEls.length) return null;
-
-        let closest = rowEls[0];
-        let minDist = Math.abs(parseInt(closest.dataset.col) - targetCol);
-        rowEls.forEach(r => {
-            const dist = Math.abs(parseInt(r.dataset.col) - targetCol);
-            if (dist < minDist) {
-                closest = r;
-                minDist = dist;
-            }
-        });
-        return closest;
+    function getFocused(): FocusableElement | null {
+        const el = document.activeElement;
+        return el instanceof HTMLElement ? el : null;
     }
 
-    switch (e.key) {
-        case "ArrowUp":
-            next = findClosest(row - 1, col);
-            break;
-        case "ArrowDown":
-            next = findClosest(row + 1, col);
-            break;
-        case "ArrowLeft":
-            next = document.querySelector(`[data-row='${row}'][data-col='${col-1}']`) ||
-                   findClosest(row, 0);
-            break;
-        case "ArrowRight":
-            next = document.querySelector(`[data-row='${row}'][data-col='${col+1}']`) ||
-                   findClosest(row, 0);
-            break;
-        case "Enter":
-            if (typeof focused.click === "function") focused.click();
-            break;
-    }
+    document.addEventListener("keydown", e => {
+        const focused: FocusableElement | null = getFocused();
+        if (!focused) return;
+        if (!focused.dataset.row || !focused.dataset.col) return;
 
-    if (next) {
-        next.focus();
-        e.preventDefault();
-    }
-});
+        const row = parseInt(focused.dataset.row);
+        const col = parseInt(focused.dataset.col);
+        let next: FocusableElement | null = null;
 
-document.addEventListener("keydown", e => {
-    if (document.body.classList.contains("preview")) return; // skip background navigation
+        function findClosest(targetRow: number, targetCol: number): FocusableElement | null {
+            let el = document.querySelector<FocusableElement>(`[data-row='${targetRow}'][data-col='${targetCol}']`);
+            if (el) return el;
 
-    const focused = document.activeElement;
-    if (!focused.dataset) return;
-    
-    if (e.key === "Enter") {
-        const focused = document.activeElement;
-        if (focused && focused.classList.contains("card")) {
-            const itemId = focused.dataset.id;
-            const item = contentDB.find(i => i.id === itemId);
-            if (item) openPreview(item);
-        }
-    }
-});
+            const rowEls = Array.from(document.querySelectorAll<FocusableElement>(`[data-row='${targetRow}']`));
+            if (!rowEls.length) return null;
 
-document.addEventListener("click", e => {
-        const focused = document.activeElement;
-        if (focused && focused.classList.contains("card")) {
-            const itemId = focused.dataset.id;
-            const item = contentDB.find(i => i.id === itemId);
-            if (item) openPreview(item);
-        }
+            let closest: FocusableElement = rowEls[0];
+            let minDist: number = Number.MAX_SAFE_INTEGER;
 
-});
-
-previewModal.addEventListener("keydown", e => {
-    const focusable = Array.from(previewModal.querySelectorAll("button, [tabindex]:not([tabindex='-1'])"));
-    const first = focusable[0];
-    const last = focusable[focusable.length - 1];
-    const focusedIndex = focusable.indexOf(document.activeElement);
-
-    switch (e.key) {
-        case "Tab":
-            if (e.shiftKey) {
-                if (document.activeElement === first) {
-                    e.preventDefault();
-                    last.focus();
+            rowEls.forEach(r => {
+                const dist = Math.abs(parseInt(r.dataset.col ?? "0") - targetCol);
+                if (dist < minDist) {
+                    closest = r;
+                    minDist = dist;
                 }
-            } else {
-                if (document.activeElement === last) {
-                    e.preventDefault();
-                    first.focus();
-                }
-            }
-            break;
+            });
 
-        case "ArrowUp":
-            e.preventDefault();
-            if (focusedIndex > 0) focusable[focusedIndex - 1].focus();
-            break;
-        case "ArrowDown":
-            e.preventDefault();
-            if (focusedIndex < focusable.length - 1) focusable[focusedIndex + 1].focus();
-            break;
-
-        case "Enter":
-        case " ":
-            if (document.activeElement.tagName === "BUTTON") {
-                e.preventDefault(); // prevent Space scrolling
-                document.activeElement.click(); // triggers click on closePreview or any other button
-            }
-            break;
-
-        case "Escape":
-        case "Backspace":
-            closePreviewModal();
-            break;
-    }
-});
-
-
-playButton.addEventListener("click", () => {
-    const focused = document.activeElement;
-    if (focused && focused.classList.contains("card")) {
-        const itemId = focused.dataset.id;
-        const item = contentDB.find(i => i.id === itemId);
-        if (item) {
-            // Encode the title to make it URL-safe
-            const titleSlug = encodeURIComponent(item.name.replace(/\s+/g, '-'));
-            window.location.href = `http://127.0.0.1:5173/${titleSlug}`;
+            return closest;
         }
-    }
-});
+
+        switch (e.key) {
+            case "ArrowUp":
+                next = findClosest(row - 1, col);
+                break;
+            case "ArrowDown":
+                next = findClosest(row + 1, col);
+                break;
+            case "ArrowLeft":
+                next = document.querySelector<FocusableElement>(`[data-row='${row}'][data-col='${col - 1}']`) ||
+                       findClosest(row, 0);
+                break;
+            case "ArrowRight":
+                next = document.querySelector<FocusableElement>(`[data-row='${row}'][data-col='${col + 1}']`) ||
+                       findClosest(row, 0);
+                break;
+            case "Enter":
+                if (typeof focused.click === "function") focused.click();
+                break;
+        }
+
+        if (next) {
+            e.preventDefault();
+            next.focus();
+        }
+    });
+
+
+}
+
 
 // ======= Focus First Card =======
 window.addEventListener("keydown", e => {
     if (document.activeElement === document.body) {
-        const firstCard = document.querySelector(".card");
+        const firstCard = document.querySelector<FocusableElement>(".card");
         if (firstCard) firstCard.focus();
     }
 }, { once: true });
 
 // ======= Initialize =======
-renderPage();
+function init() {
+    assignRowCol();
+    renderPage();
+    search(); 
+    navigation();
+}
+
+init()
