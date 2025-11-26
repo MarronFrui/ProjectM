@@ -11,12 +11,21 @@
     "test": "test",
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite build"
+    "preview": "vite build",
+    "scrape:db": "tsx ./scraper.ts"
   },
   "author": "Marron",
   "license": "ISC",
   "bugs": {
     "url": "https://github.com/MarronFrui/ProjectM/issues"
   },
-  "homepage": "https://github.com/MarronFrui/ProjectM#readme"
+  "homepage": "https://github.com/MarronFrui/ProjectM#readme",
+  "devDependencies": {
+    "@types/jsdom": "^27.0.0",
+    "@types/node": "^24.10.1",
+    "tsx": "^4.20.6"
+  },
+  "dependencies": {
+    "jsdom": "^27.0.1"
+  }
 }

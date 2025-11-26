@@ -7,7 +7,7 @@ body {
 }
 
 body.preview {
-  overflow: hidden;
+    overflow: hidden;
 }
 
 header {
@@ -44,7 +44,8 @@ a {
     background-color: #1f1f1f;
     color: #e0e0e0;
     font-size: 0.95rem;
-    transition: width 0.3s ease, padding 0.3s ease, border-color 0.3s ease, background-color 0.3s ease;
+    transition: width 0.3s ease, padding 0.3s ease, border-color 0.3s ease,
+        background-color 0.3s ease;
 }
 
 #search::placeholder {
@@ -188,8 +189,8 @@ a {
 .disponibility-container {
     display: flex;
     flex-direction: column; /* stack available/unavailable vertically */
-    gap: 1rem;             /* optional spacing between sections */
-    width: 100%;            /* fill the movie grid width */
+    gap: 1rem; /* optional spacing between sections */
+    width: 100%; /* fill the movie grid width */
     height: 100%;
     box-sizing: border-box;
 }
@@ -198,13 +199,13 @@ a {
 .unavailable {
     display: flex;
     flex-direction: column; /* stack cards vertically inside each section */
-    flex: 1;                 /* allow sections to grow equally */
-    width: 100%;             /* fill container width */
+    flex: 1; /* allow sections to grow equally */
+    width: 100%; /* fill container width */
 }
 
 .available h2,
 .unavailable h2 {
-    margin-left: 4rem;       /* optional: align titles nicely */
+    margin-left: 4rem; /* optional: align titles nicely */
 }
 
 .card-container {
@@ -225,9 +226,11 @@ a {
 #preview-modal {
     display: none;
     position: fixed;
-    top: 0; left: 0;
-    width: 100%; height: 100%;
-    background: rgba(0,0,0,0.8);
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.8);
     justify-content: center;
     align-items: center;
     z-index: 100;
@@ -268,16 +271,31 @@ a {
     cursor: pointer;
 }
 
- #preview-name {
+#preview-name {
     display: flex;
     align-items: center;
     justify-content: center;
- }
+}
 
- #preview-image {
+#preview-image {
     width: 90%;
     height: auto;
     margin-bottom: 1rem;
     object-fit: cover;
     border-radius: 4px;
+}
+
+.videoplayer-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: auto;
+
+}
+
+.videoplayer {
+    width: min(95%, calc(80vh * (16 / 9)));
+    aspect-ratio: 16 / 9;
+    border-radius: 8px;
+    box-shadow: 0 0 20px rgba(0, 0, 0, 0.7);
 }

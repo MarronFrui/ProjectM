@@ -1,4 +1,4 @@
-import {contentDB, ContentItem } from "./config.ts";
+import {contentDB, ContentItem } from "./config";
 
 const params = new URLSearchParams(window.location.search);
 const slug = params.get("slug");

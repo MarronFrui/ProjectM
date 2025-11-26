@@ -1,4 +1,4 @@
-import {contentDB, ContentItem } from "./config.ts";
+import { loadContentDB, contentDB, ContentItem } from "./config";
 
 const contentItemCache: Record<string, ContentItem> = {};
 contentDB.forEach((item) => (contentItemCache[item.id] = item));
@@ -49,7 +49,7 @@ function renderCards(cards: ContentItem[], container: HTMLElement): void {
         card.dataset.id = item.id;
 
         const img = document.createElement("img");
-        img.src = "./content_info/images/default.jpg";
+        img.src = item.poster ?? "./content-info/poster/default.jpg";
         img.alt = item.name;
         img.style.width = "100%";
         img.style.height = "75%";
@@ -81,8 +81,7 @@ function renderCards(cards: ContentItem[], container: HTMLElement): void {
 
         if (isAvailable) {
             const duration = document.createElement("p");
-            const randomDuration = 80 + Math.floor(Math.random() * 101);
-            duration.textContent = `Duration: ${randomDuration} min`;
+            duration.textContent = `Duration: ${item.duration ?? "??"} min`;
             duration.style.textAlign = "center";
             duration.style.margin = "0.25rem 0";
             duration.style.fontSize = "0.85rem";
@@ -134,7 +133,10 @@ function assignRowCol() {
     assignCards(containerUnavailable);
 }
 
-function renderPage(filterCategory: ContentItem["category"] | null = null, filterSearch = "") {
+function renderPage(
+    filterCategory: ContentItem["category"] | null = null,
+    filterSearch = ""
+) {
     let filtered = contentDB;
 
     if (filterCategory) {
@@ -388,11 +390,17 @@ playButton.addEventListener("click", () => {
     window.location.href = `mediaplayer.html?slug=${slug}`;
 });
 
-function init() {
-    assignRowCol();
-    renderPage();
-    search();
-    navigation();
+async function init() {
+    try {
+        await loadContentDB();
+        Object.assign(contentItemCache, Object.fromEntries(contentDB.map((i) => [i.id, i])));
+        assignRowCol();
+        renderPage();
+        search();
+        navigation();
+    } catch (err) {
+        console.error("Failed to initialize:", err);
+    }
 }
 
 init();
