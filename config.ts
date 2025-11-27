@@ -8,8 +8,9 @@ export interface ContentItem {
     duration: number;
     seasons: number | null;
     episodes: number | null;
+    poster: string; 
     filePath?: string; 
-    poster?: string; 
+    releaseYear?: number | null;
 }
 
 // ======= Content Dataset =======
