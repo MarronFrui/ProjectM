@@ -7,10 +7,6 @@ import { ContentItem } from "./config";
 const API_KEY = keyConfig.API_KEY;
 const BASE_URL = "https://api.themoviedb.org/3";
 
-const IMDB_DIR = "./content-info/imdb";
-const BASICS_FILE = path.join(IMDB_DIR, "title.basics.tsv");
-const RATINGS_FILE = path.join(IMDB_DIR, "title.ratings.tsv");
-
 const POSTER_DIR = "./content-info/poster";
 const METADATA_DIR = "./content-info/metadata";
 const OUTPUT_FILE = "./content-info/contentDB.json";
@@ -21,7 +17,6 @@ const TMDB_IMAGE_BASE = "https://image.tmdb.org/t/p/original";
 
 fs.mkdirSync(POSTER_DIR, { recursive: true });
 fs.mkdirSync(METADATA_DIR, { recursive: true });
-fs.mkdirSync(IMDB_DIR, { recursive: true });
 
 // Load existing content DB
 let contentDB: ContentItem[] = [];
@@ -31,22 +26,22 @@ if (fs.existsSync(OUTPUT_FILE)) {
         contentDB = raw ? JSON.parse(raw) : [];
     } catch {}
 }
-const existingImdbSet = new Set(contentDB.map((c) => c.imdbID));
+const existingTmdbSet = new Set(contentDB.map((c) => c.id));
 
 // Load skipped IDs
-let skippedImdbSet = new Set<string>();
+let skippedSet = new Set<string>();
 if (fs.existsSync(SKIPPED_FILE)) {
     const raw = fs.readFileSync(SKIPPED_FILE, "utf-8");
-    skippedImdbSet = new Set(raw.split("\n").filter(Boolean));
+    skippedSet = new Set(raw.split("\n").filter(Boolean));
 }
 
 function addSkipped(id: string) {
-    if (!skippedImdbSet.has(id)) {
-        skippedImdbSet.add(id);
+    if (!skippedSet.has(id)) {
+        skippedSet.add(id);
         fs.appendFileSync(SKIPPED_FILE, `${id}\n`);
     }
 }
-// ------------------- Helpers -------------------
+
 async function fetchJSON(url: string) {
     const res = await fetch(url);
     if (!res.ok) throw new Error(`Failed to fetch ${url}: ${res.status}`);
@@ -70,311 +65,143 @@ function mapCategory(type?: string): "Film" | "Serie" | "Documentaire" {
     return "Film";
 }
 
-function headerIndices(headerLine: string) {
-    const cols = headerLine.split("\t");
-    return Object.fromEntries(cols.map((c, i) => [c, i]));
-}
-
-// ------------------- Load Ratings -------------------
-async function loadRatings(ratingsPath: string) {
-    console.log("Loading IMDb ratings...");
-    const map = new Map<
-        string,
-        { averageRating: number | null; numVotes: number | null }
-    >();
-    if (!fs.existsSync(ratingsPath)) return map;
-
-    const input = fs.createReadStream(ratingsPath, { encoding: "utf8" });
-    let leftover = "";
-    let indices: Record<string, number> = {};
-    let headerProcessed = false;
-
-    for await (const chunk of input) {
-        let text = leftover + chunk;
-        const lines = text.split("\n");
-        leftover = lines.pop() ?? "";
-
-        for (let line of lines) {
-            line = line.trim();
-            if (!line) continue;
-            if (!headerProcessed) {
-                indices = headerIndices(line);
-                headerProcessed = true;
-                continue;
-            }
-            const cols = line.split("\t");
-            const tconst = cols[indices["tconst"]];
-            map.set(tconst, {
-                averageRating:
-                    cols[indices["averageRating"]] === "\\N"
-                        ? null
-                        : parseFloat(cols[indices["averageRating"]]),
-                numVotes:
-                    cols[indices["numVotes"]] === "\\N"
-                        ? null
-                        : parseInt(cols[indices["numVotes"]], 10),
-            });
-        }
-    }
-
-    if (leftover.trim() && headerProcessed) {
-        const cols = leftover.trim().split("\t");
-        const tconst = cols[indices["tconst"]];
-        map.set(tconst, {
-            averageRating:
-                cols[indices["averageRating"]] === "\\N"
-                    ? null
-                    : parseFloat(cols[indices["averageRating"]]),
-            numVotes:
-                cols[indices["numVotes"]] === "\\N"
-                    ? null
-                    : parseInt(cols[indices["numVotes"]], 10),
-        });
-    }
-
-    return map;
-}
-
-// ------------------- Build Candidates -------------------
 type Candidate = {
-    tconst: string;
-    primaryTitle: string;
-    titleType: string;
-    startYear: number | null;
-    runtimeMinutes: number | null;
-    genres: string | null;
-    numVotes: number;
+    id: number;
+    title: string;
+    type: "movie" | "tv";
+    releaseDate: string;
 };
 
-async function buildCandidates(
-    basicsPath: string,
-    ratingsMap: Map<
-        string,
-        { averageRating: number | null; numVotes: number | null }
-    >
-) {
-    console.log("Building discovery candidates from IMDb basics...");
-    const candidates: Candidate[] = [];
-    if (!fs.existsSync(basicsPath))
-        throw new Error(`IMDb basics file not found: ${basicsPath}`);
-
-    const input = fs.createReadStream(basicsPath, { encoding: "utf8" });
-    let leftover = "";
-    let indices: Record<string, number> = {};
-    let headerProcessed = false;
-
-    for await (const chunk of input) {
-        let text = leftover + chunk;
-        const lines = text.split("\n");
-        leftover = lines.pop() ?? "";
-
-        for (let line of lines) {
-            line = line.trim();
-            if (!line) continue;
-            if (!headerProcessed) {
-                indices = headerIndices(line);
-                headerProcessed = true;
-                continue;
-            }
-
-            const cols = line.split("\t");
-            const tconst = cols[indices["tconst"]];
-            const titleType = cols[indices["titleType"]];
-            if (!(titleType === "movie" || titleType === "tvSeries")) continue;
-
-            const startYear =
-                cols[indices["startYear"]] === "\\N"
-                    ? null
-                    : parseInt(cols[indices["startYear"]], 10);
-            const runtimeMinutes =
-                cols[indices["runtimeMinutes"]] === "\\N"
-                    ? null
-                    : parseInt(cols[indices["runtimeMinutes"]], 10);
-
-            candidates.push({
-                tconst,
-                primaryTitle: cols[indices["primaryTitle"]],
-                titleType,
-                startYear,
-                runtimeMinutes,
-                genres: cols[indices["genres"]],
-                numVotes: ratingsMap.get(tconst)?.numVotes ?? 0,
-            });
-        }
-    }
-
-    if (leftover.trim() && headerProcessed) {
-        const cols = leftover.trim().split("\t");
-        const tconst = cols[indices["tconst"]];
-        const titleType = cols[indices["titleType"]];
-        if (titleType === "movie" || titleType === "tvSeries") {
-            const startYear =
-                cols[indices["startYear"]] === "\\N"
-                    ? null
-                    : parseInt(cols[indices["startYear"]], 10);
-            const runtimeMinutes =
-                cols[indices["runtimeMinutes"]] === "\\N"
-                    ? null
-                    : parseInt(cols[indices["runtimeMinutes"]], 10);
-            candidates.push({
-                tconst,
-                primaryTitle: cols[indices["primaryTitle"]],
-                titleType,
-                startYear,
-                runtimeMinutes,
-                genres: cols[indices["genres"]],
-                numVotes: ratingsMap.get(tconst)?.numVotes ?? 0,
-            });
-        }
-    }
-
-    console.log(
-        `Found ${candidates.length} candidate titles. Sorting & selecting top ${DISCOVERY_LIMIT}...`
+// Example: fetch latest TMDb content (adjust genre or discover query)
+async function fetchCandidates(): Promise<Candidate[]> {
+    const today = new Date().toISOString().slice(0, 10);
+    const data = await fetchJSON(
+        `${BASE_URL}/discover/movie?api_key=${API_KEY}&sort_by=release_date.desc&release_date.lte=${today}`
     );
-    return candidates;
+
+    const movies = (data.results ?? []).map((r: any) => ({
+        id: r.id,
+        title: r.title ?? r.name,
+        type: "movie" as const,
+        releaseDate: r.release_date ?? "",
+    }));
+
+    const tvData = await fetchJSON(
+        `${BASE_URL}/discover/tv?api_key=${API_KEY}&sort_by=first_air_date.desc&first_air_date.lte=${today}`
+    );
+
+    const series = (tvData.results ?? []).map((r: any) => ({
+        id: r.id,
+        title: r.name,
+        type: "tv" as const,
+        releaseDate: r.first_air_date ?? "",
+    }));
+
+    return [...movies, ...series];
 }
 
-// ------------------- TMDb Fetch -------------------
 async function fetchAndBuildItem(c: Candidate): Promise<ContentItem | null> {
-    if (existingImdbSet.has(c.tconst) || skippedImdbSet.has(c.tconst))
-        return null;
+    const key = `${c.type}-${c.id}`;
+    if (existingTmdbSet.has(key) || skippedSet.has(key)) return null;
 
     try {
-        // Determine endpoint based on type
-        const isSeries = c.titleType === "tvSeries";
-        const query = encodeURIComponent(c.primaryTitle);
-        const yearParam = c.startYear ? `&year=${c.startYear}` : "";
-        const endpoint = isSeries ? "search/tv" : "search/movie";
-
-        const dataSearch = await fetchJSON(
-            `${BASE_URL}/${endpoint}?api_key=${API_KEY}&query=${query}${yearParam}`
-        );
-
-        if (!dataSearch.results || dataSearch.results.length === 0) {
-            console.log(`TMDb lookup failed for ${c.tconst}: not found.`);
-            addSkipped(c.tconst);
-            return null;
-        }
-
-        const data = dataSearch.results[0];
-        const releaseYear = data.release_date
-            ? parseInt(data.release_date.slice(0, 4), 10)
-            : data.first_air_date
-            ? parseInt(data.first_air_date.slice(0, 4), 10)
-            : null;
+        const detailsUrl =
+            c.type === "movie"
+                ? `${BASE_URL}/movie/${c.id}?api_key=${API_KEY}`
+                : `${BASE_URL}/tv/${c.id}?api_key=${API_KEY}`;
+        const details = await fetchJSON(detailsUrl);
 
         let duration = 0;
-        if (!isSeries) {
-            const details = await fetchJSON(
-                `${BASE_URL}/movie/${data.id}?api_key=${API_KEY}`
-            );
-            duration = details.runtime ?? c.runtimeMinutes ?? 0;
+        if (c.type === "movie") {
+            duration = details.runtime ?? 0;
+            if (duration < 60) {
+                console.log(
+                    `Skipping ${c.title}: film too short (${duration} min)`
+                );
+                addSkipped(key);
+                return null;
+            }
         } else {
-            // For series, use episode runtime if available
-            const details = await fetchJSON(
-                `${BASE_URL}/tv/${data.id}?api_key=${API_KEY}`
+            const runtimes = (details.episode_run_time ?? []).filter(
+                (r: number) => r > 0
             );
-            duration = details.episode_run_time?.[0] ?? 0;
+            const avgEpisodeDuration = runtimes.length
+                ? runtimes.reduce((a: number, b: number) => a + b, 0) /
+                  runtimes.length
+                : 0;
+
+            const numberOfEpisodes = details.number_of_episodes ?? 0;
+            duration = Math.round(numberOfEpisodes * avgEpisodeDuration);
+
+            if (duration < 20) {
+                console.log(
+                    `Skipping ${c.title}: series too short (${duration} min)`
+                );
+                addSkipped(key);
+                return null;
+            }
         }
 
-        const nowYear = new Date().getFullYear();
-        if (!releaseYear || releaseYear > nowYear) {
-            console.log(
-                `Skipping ${c.primaryTitle} (${c.tconst}): release year in the future`
-            );
-            addSkipped(c.tconst);
-
-            return null;
-        }
-
-        // Duration checks
-        if (!isSeries && duration < 60) {
-            console.log(
-                `Skipping ${c.primaryTitle} (${c.tconst}): film too short (${duration} min)`
-            );
-            addSkipped(c.tconst);
-            return null;
-        }
-        if (isSeries && duration < 20) {
-            console.log(
-                `Skipping ${c.primaryTitle} (${c.tconst}): series too short (${duration} min)`
-            );
-            addSkipped(c.tconst);
-            return null;
-        }
-
-        // Poster
-        const posterPath = path.join(POSTER_DIR, `${data.id}.jpg`);
-        const posterUrl = data.poster_path
-            ? `${TMDB_IMAGE_BASE}${data.poster_path}`
+        const posterPath = path.join(POSTER_DIR, `${c.id}.jpg`);
+        const posterUrl = details.poster_path
+            ? `${TMDB_IMAGE_BASE}${details.poster_path}`
             : null;
         if (!posterUrl || !(await downloadPoster(posterUrl, posterPath))) {
-            console.log(
-                `Skipping ${c.primaryTitle} (${c.tconst}): poster download failed`
-            );
-            addSkipped(c.tconst);
+            console.log(`Skipping ${c.title}: poster download failed`);
+            addSkipped(key);
             return null;
         }
 
-        // Save metadata
-        const metadataPath = path.join(METADATA_DIR, `${data.id}.json`);
+        const metadataPath = path.join(METADATA_DIR, `${c.id}.json`);
         try {
-            fs.writeFileSync(metadataPath, JSON.stringify(data, null, 2));
+            fs.writeFileSync(metadataPath, JSON.stringify(details, null, 2));
         } catch {}
 
+        // Map genres from TMDb
+        const genres: string[] = (details.genres ?? []).map((g: any) => g.name);
+
         const item: ContentItem = {
-            id: `tmdb-${data.id}`,
-            imdbID: c.tconst,
-            name: data.title ?? data.name ?? c.primaryTitle,
-            description: data.overview ?? "No description",
-            category: mapCategory(isSeries ? "tv" : "movie"),
+            id: key,
+            name: details.title ?? details.name ?? c.title,
+            description: details.overview ?? "No description",
+            category: (details.genres ?? []).map((g: any) => g.name),
             available: true,
             duration,
-            seasons: isSeries ? data.number_of_seasons ?? 1 : null,
-            episodes: isSeries ? data.number_of_episodes ?? null : null,
+            seasons: c.type === "tv" ? details.number_of_seasons ?? 1 : null,
+            episodes:
+                c.type === "tv" ? details.number_of_episodes ?? null : null,
             poster: posterPath,
-            releaseYear,
+            releaseYear: parseInt(
+                (details.release_date ?? details.first_air_date ?? "0").slice(
+                    0,
+                    4
+                ),
+                10
+            ),
         };
 
-        existingImdbSet.add(c.tconst);
+        existingTmdbSet.add(key);
         contentDB.push(item);
         fs.writeFileSync(OUTPUT_FILE, JSON.stringify(contentDB, null, 2));
         return item;
     } catch (err) {
-        console.log(`TMDb lookup failed for ${c.tconst}: fetch error`);
-        addSkipped(c.tconst);
+        console.log(`Failed ${c.title}: fetch error`);
+        addSkipped(key);
         return null;
     }
 }
 
-
 async function run() {
-    const ratingsMap = await loadRatings(RATINGS_FILE);
-    const candidates = await buildCandidates(BASICS_FILE, ratingsMap);
+    const candidates = await fetchCandidates();
 
     console.log(
-        `Fetching TMDb metadata for ${Math.min(
-            DISCOVERY_LIMIT,
-            candidates.length
-        )} candidates (will skip duplicates/missing posters)...`
+        `Fetching TMDb metadata for up to ${DISCOVERY_LIMIT} new items...`
     );
 
-    candidates.sort((a, b) => {
-        const yearA = a.startYear ?? 0;
-        const yearB = b.startYear ?? 0;
-        if (yearA !== yearB) return yearB - yearA;
-
-        if (a.numVotes !== b.numVotes) return b.numVotes - a.numVotes;
-
-        // 3. Optional: prefer movies over series
-        const typeScore: Record<string, number> = { movie: 2, tvSeries: 1 };
-        return (typeScore[b.titleType] ?? 0) - (typeScore[a.titleType] ?? 0);
-    });
-
     let added = 0;
-    for (const candidate of candidates) {
+    for (const c of candidates) {
         if (added >= DISCOVERY_LIMIT) break;
-        const item = await fetchAndBuildItem(candidate);
+        const item = await fetchAndBuildItem(c);
         if (item) added++;
     }
 

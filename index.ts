@@ -139,9 +139,11 @@ function renderPage(
 ) {
     let filtered = contentDB;
 
-    if (filterCategory) {
-        filtered = filtered.filter((item) => item.category === filterCategory);
-    }
+    if (filterCategory && filterCategory.length > 0) {
+    filtered = filtered.filter((item) =>
+        item.category.some((cat) => filterCategory.includes(cat))
+    );
+}
 
     if (filterSearch) {
         filtered = filtered.filter((item) =>
@@ -223,9 +225,9 @@ function openPreviewModal(item: ContentItem) {
     previewDescription.textContent = item.description;
     previewDuration.textContent = `Duration: ${item.duration} min`;
     previewSeasonsEpisodes.textContent =
-        item.category === "Serie"
-            ? `Seasons: ${item.seasons}, Episodes: ${item.episodes}`
-            : "";
+    item.category.includes("Serie")
+        ? `Seasons: ${item.seasons}, Episodes: ${item.episodes}`
+        : "";
 
     lastFocusedElement =
         document.activeElement instanceof HTMLElement

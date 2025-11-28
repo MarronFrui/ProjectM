@@ -1,9 +1,8 @@
 export interface ContentItem {
     id: string;
-    imdbID: string; 
     name: string;
     description: string;
-    category: "Film" | "Serie" | "Documentaire";
+    category: string[];
     available: boolean;
     duration: number;
     seasons: number | null;

@@ -36,6 +36,17 @@ a {
     margin-right: 4rem;
 }
 
+#back-button {
+    background-color: #333;
+    color: #fff;
+    border: none;
+    margin-left: 2rem;
+    padding: 0.5rem 1rem;
+    border-radius: 0.25rem;
+    font-size: 1rem;
+    cursor: pointer;
+}
+
 #search {
     width: 10rem;
     padding: 6px 10px;
@@ -108,6 +119,13 @@ a {
     overflow: visible;
 }
 
+.menu-container {
+    display: flex;
+    flex-direction: row;
+    padding-bottom: 3rem;
+    justify-content: space-between;
+}
+
 .card {
     display: flex;
     min-width: 1rem;
@@ -120,6 +138,13 @@ a {
     will-change: transform, box-shadow;
     outline: none;
     user-select: none;
+}
+
+.card h3,
+.card p {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .smaller-card {
@@ -278,7 +303,7 @@ a {
 }
 
 #preview-image {
-    width: 90%;
+    width: 65%;
     height: auto;
     margin-bottom: 1rem;
     object-fit: cover;
@@ -299,3 +324,4 @@ a {
     border-radius: 8px;
     box-shadow: 0 0 20px rgba(0, 0, 0, 0.7);
 }
+
