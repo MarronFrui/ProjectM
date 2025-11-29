@@ -5,6 +5,7 @@ export interface ContentItem {
     category: string[];
     available: boolean;
     duration: number;
+    rating: number;
     seasons: number | null;
     episodes: number | null;
     poster: string; 

@@ -1,4 +1,4 @@
-import { contentDB, loadContentDB } from "./config.js";
+import { contentDB, loadContentDB } from "./config";
 
 const container = document.getElementById("category-container");
 const backButton = document.getElementById("back-button");

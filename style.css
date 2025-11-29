@@ -107,16 +107,21 @@ a {
 }
 
 #card-container::-webkit-scrollbar {
-    display: none; /* Chrome, Safari */
+    display: none;
 }
 
-.smaller-card-container {
+.smaller-card-container,
+.smaller-card-container-categories {
     margin-left: 5rem;
     display: flex;
     padding: 0.3rem;
     flex-direction: row;
     gap: 2rem;
     overflow: visible;
+}
+
+.smaller-card-container-categories {
+    flex-wrap: wrap;
 }
 
 .menu-container {

@@ -269,7 +269,7 @@ function findClosest(
     return closest;
 }
 
-function navigation(): void {
+export function navigation(): void {
     function getFocused(): FocusableElement | null {
         const el = document.activeElement;
         return el instanceof HTMLElement ? el : null;

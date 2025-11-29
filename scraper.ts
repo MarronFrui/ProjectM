@@ -12,13 +12,16 @@ const METADATA_DIR = "./content-info/metadata";
 const OUTPUT_FILE = "./content-info/contentDB.json";
 const SKIPPED_FILE = "./content-info/skipped.txt";
 
-const DISCOVERY_LIMIT = 50;
+const TOP_RATED_LIMIT = 200; // First X ammount of content are sorted by review
+const DISCOVERY_LIMIT = 0;  // Then fallback to release date prioritization
+
 const TMDB_IMAGE_BASE = "https://image.tmdb.org/t/p/original";
+
+type Phase = "top-rated" | "recent";
 
 fs.mkdirSync(POSTER_DIR, { recursive: true });
 fs.mkdirSync(METADATA_DIR, { recursive: true });
 
-// Load existing content DB
 let contentDB: ContentItem[] = [];
 if (fs.existsSync(OUTPUT_FILE)) {
     try {
@@ -28,7 +31,6 @@ if (fs.existsSync(OUTPUT_FILE)) {
 }
 const existingTmdbSet = new Set(contentDB.map((c) => c.id));
 
-// Load skipped IDs
 let skippedSet = new Set<string>();
 if (fs.existsSync(SKIPPED_FILE)) {
     const raw = fs.readFileSync(SKIPPED_FILE, "utf-8");
@@ -57,44 +59,49 @@ async function downloadPoster(url: string, filename: string) {
     return true;
 }
 
-function mapCategory(type?: string): "Film" | "Serie" | "Documentaire" {
-    if (!type) return "Film";
-    const t = type.toLowerCase();
-    if (t === "movie") return "Film";
-    if (t === "tv") return "Serie";
-    return "Film";
-}
-
 type Candidate = {
     id: number;
     title: string;
     type: "movie" | "tv";
     releaseDate: string;
+    rating: number;
 };
 
-// Example: fetch latest TMDb content (adjust genre or discover query)
-async function fetchCandidates(): Promise<Candidate[]> {
+function buildDiscoverURL(type: "movie" | "tv", page: number, phase: Phase) {
     const today = new Date().toISOString().slice(0, 10);
-    const data = await fetchJSON(
-        `${BASE_URL}/discover/movie?api_key=${API_KEY}&sort_by=release_date.desc&release_date.lte=${today}`
-    );
 
-    const movies = (data.results ?? []).map((r: any) => ({
+    if (phase === "top-rated") {
+        return type === "movie"
+            ? `${BASE_URL}/movie/top_rated?api_key=${API_KEY}&page=${page}`
+            : `${BASE_URL}/tv/top_rated?api_key=${API_KEY}&page=${page}`;
+    }
+
+    return type === "movie"
+        ? `${BASE_URL}/discover/movie?api_key=${API_KEY}&sort_by=release_date.desc&release_date.lte=${today}&page=${page}`
+        : `${BASE_URL}/discover/tv?api_key=${API_KEY}&sort_by=first_air_date.desc&first_air_date.lte=${today}&page=${page}`;
+}
+
+async function fetchCandidates(page = 1, phase: Phase): Promise<Candidate[]> {
+    const movieURL = buildDiscoverURL("movie", page, phase);
+    const tvURL = buildDiscoverURL("tv", page, phase);
+
+    const movieData = await fetchJSON(movieURL);
+    const tvData = await fetchJSON(tvURL);
+
+    const movies = (movieData.results ?? []).map((r: any) => ({
         id: r.id,
         title: r.title ?? r.name,
         type: "movie" as const,
         releaseDate: r.release_date ?? "",
+        rating: r.vote_average ?? 0,
     }));
-
-    const tvData = await fetchJSON(
-        `${BASE_URL}/discover/tv?api_key=${API_KEY}&sort_by=first_air_date.desc&first_air_date.lte=${today}`
-    );
 
     const series = (tvData.results ?? []).map((r: any) => ({
         id: r.id,
         title: r.name,
         type: "tv" as const,
         releaseDate: r.first_air_date ?? "",
+        rating: r.vote_average ?? 0,
     }));
 
     return [...movies, ...series];
@@ -109,6 +116,7 @@ async function fetchAndBuildItem(c: Candidate): Promise<ContentItem | null> {
             c.type === "movie"
                 ? `${BASE_URL}/movie/${c.id}?api_key=${API_KEY}`
                 : `${BASE_URL}/tv/${c.id}?api_key=${API_KEY}`;
+
         const details = await fetchJSON(detailsUrl);
 
         let duration = 0;
@@ -129,7 +137,6 @@ async function fetchAndBuildItem(c: Candidate): Promise<ContentItem | null> {
                 ? runtimes.reduce((a: number, b: number) => a + b, 0) /
                   runtimes.length
                 : 0;
-
             const numberOfEpisodes = details.number_of_episodes ?? 0;
             duration = Math.round(numberOfEpisodes * avgEpisodeDuration);
 
@@ -140,6 +147,20 @@ async function fetchAndBuildItem(c: Candidate): Promise<ContentItem | null> {
                 addSkipped(key);
                 return null;
             }
+        }
+
+        const title = details.title ?? details.name ?? c.title;
+        if (!/^[\u0000-\u007F]+$/.test(title)) {
+            console.log(`Skipping ${title}: non-Latin characters detected`);
+            addSkipped(key);
+            return null;
+        }
+
+        const rating = details.vote_average ?? 0;
+        if (rating < 5) {
+            console.log(`Skipping ${title}: rating too low (${rating})`);
+            addSkipped(key);
+            return null;
         }
 
         const posterPath = path.join(POSTER_DIR, `${c.id}.jpg`);
@@ -157,16 +178,14 @@ async function fetchAndBuildItem(c: Candidate): Promise<ContentItem | null> {
             fs.writeFileSync(metadataPath, JSON.stringify(details, null, 2));
         } catch {}
 
-        // Map genres from TMDb
-        const genres: string[] = (details.genres ?? []).map((g: any) => g.name);
-
         const item: ContentItem = {
             id: key,
-            name: details.title ?? details.name ?? c.title,
+            name: title,
             description: details.overview ?? "No description",
             category: (details.genres ?? []).map((g: any) => g.name),
             available: true,
             duration,
+            rating,
             seasons: c.type === "tv" ? details.number_of_seasons ?? 1 : null,
             episodes:
                 c.type === "tv" ? details.number_of_episodes ?? null : null,
@@ -191,23 +210,36 @@ async function fetchAndBuildItem(c: Candidate): Promise<ContentItem | null> {
     }
 }
 
-async function run() {
-    const candidates = await fetchCandidates();
-
-    console.log(
-        `Fetching TMDb metadata for up to ${DISCOVERY_LIMIT} new items...`
-    );
-
+async function runPhase(phase: Phase, phaseLimit: number) {
     let added = 0;
-    for (const c of candidates) {
-        if (added >= DISCOVERY_LIMIT) break;
-        const item = await fetchAndBuildItem(c);
-        if (item) added++;
+    let page = 1;
+
+    while (added < phaseLimit) {
+        const candidates = await fetchCandidates(page, phase);
+        if (candidates.length === 0) break;
+
+        candidates.sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0));
+
+        for (const c of candidates) {
+            const item = await fetchAndBuildItem(c);
+            if (item) {
+                added++;
+                console.log(`Added: ${item.name} (${item.id}) [phase=${phase}]`);
+            }
+            if (added >= phaseLimit) break;
+        }
+
+        page++;
     }
 
-    console.log(
-        `Added ${added} new items. DB now has ${contentDB.length} items.`
-    );
+    console.log(`Phase ${phase} finished. Added ${added} new items.`);
+}
+
+async function run() {
+    await runPhase("top-rated", TOP_RATED_LIMIT);
+    await runPhase("recent", DISCOVERY_LIMIT);
+
+    console.log(`Completed all phases. DB now has ${contentDB.length} items.`);
 }
 
 run().catch((err) => {

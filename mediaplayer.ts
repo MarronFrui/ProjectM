@@ -37,7 +37,8 @@ export class MediaPlayer {
         this.videoElement.removeAttribute("src"); // clear player
     }
 
-    if (item.category === "Serie" && this.episodeSelector && this.seasonSelector) {
+    // Updated check for Series category
+    if (item.category.includes("Serie") && this.episodeSelector && this.seasonSelector) {
         this.populateEpisodes(item);
         this.populateSeasons(item);
     }
