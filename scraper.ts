@@ -12,8 +12,8 @@ const METADATA_DIR = "./content-info/metadata";
 const OUTPUT_FILE = "./content-info/contentDB.json";
 const SKIPPED_FILE = "./content-info/skipped.txt";
 
-const TOP_RATED_LIMIT = 200; // First X ammount of content are sorted by review
-const DISCOVERY_LIMIT = 0;  // Then fallback to release date prioritization
+const TOP_RATED_LIMIT = 500; // First X ammount of content are sorted by review
+const DISCOVERY_LIMIT = 1000;  // Then fallback to release date prioritization
 
 const TMDB_IMAGE_BASE = "https://image.tmdb.org/t/p/original";
 
@@ -129,6 +129,14 @@ async function fetchAndBuildItem(c: Candidate): Promise<ContentItem | null> {
                 addSkipped(key);
                 return null;
             }
+            if (duration > 300) {
+                console.log(
+                    `Skipping ${c.title}: film too long (${duration} min)`
+                );
+                addSkipped(key);
+                return null;
+            }
+
         } else {
             const runtimes = (details.episode_run_time ?? []).filter(
                 (r: number) => r > 0
@@ -157,7 +165,7 @@ async function fetchAndBuildItem(c: Candidate): Promise<ContentItem | null> {
         }
 
         const rating = details.vote_average ?? 0;
-        if (rating < 5) {
+        if (rating < 7.5) {
             console.log(`Skipping ${title}: rating too low (${rating})`);
             addSkipped(key);
             return null;
