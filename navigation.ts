@@ -4,7 +4,10 @@ const contentItemCache: Record<string, ContentItem> = {};
 contentDB.forEach((item) => (contentItemCache[item.id] = item));
 
 // ======= DOM Elements =======
-const containerAvailable = document.getElementById("available-cards") || document.getElementById("card-container") || null;
+const containerAvailable =
+    document.getElementById("available-cards") ||
+    document.getElementById("card-container") ||
+    null;
 const containerUnavailable = document.getElementById("unavailable-cards");
 const searchBar = document.getElementById("search");
 const categories = Array.from(
@@ -272,7 +275,6 @@ export function findClosest(
     return closest;
 }
 
-
 export function menuNavigation(): void {
     function getFocused(): FocusableElement | null {
         const el = document.activeElement;
@@ -283,37 +285,38 @@ export function menuNavigation(): void {
         const focused = getFocused();
         if (!focused) return;
 
-        if (previewModal.classList.contains("active")) {
-            const currentIndex = modalFocusableCache.indexOf(focused);
-            let nextIndex = currentIndex;
+            if (previewModal && previewModal.classList.contains("active")) {
+                const currentIndex = modalFocusableCache.indexOf(focused);
+                let nextIndex = currentIndex;
 
-            switch (e.key) {
-                case "ArrowRight":
-                case "ArrowDown":
-                    nextIndex = (currentIndex + 1) % modalFocusableCache.length;
-                    break;
-                case "ArrowLeft":
-                case "ArrowUp":
-                    nextIndex =
-                        (currentIndex - 1 + modalFocusableCache.length) %
-                        modalFocusableCache.length;
-                    break;
-                case "Enter":
-                case "OK":
-                    focused.click();
-                    break;
-                case "Escape":
-                case "Back":
-                    closePreviewModal();
-                    break;
-                default:
-                    return;
+                switch (e.key) {
+                    case "ArrowRight":
+                    case "ArrowDown":
+                        nextIndex =
+                            (currentIndex + 1) % modalFocusableCache.length;
+                        break;
+                    case "ArrowLeft":
+                    case "ArrowUp":
+                        nextIndex =
+                            (currentIndex - 1 + modalFocusableCache.length) %
+                            modalFocusableCache.length;
+                        break;
+                    case "Enter":
+                    case "OK":
+                        focused.click();
+                        break;
+                    case "Escape":
+                    case "Back":
+                        closePreviewModal();
+                        break;
+                    default:
+                        return;
+                }
+
+                e.preventDefault();
+                modalFocusableCache[nextIndex].focus();
+                return;
             }
-
-            e.preventDefault();
-            modalFocusableCache[nextIndex].focus();
-            return;
-        }
 
         const row = parseInt(focused.dataset.row!);
         const col = parseInt(focused.dataset.col!);
