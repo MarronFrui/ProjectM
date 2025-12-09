@@ -13,7 +13,8 @@ const searchBar = document.getElementById("search");
 const categories = Array.from(
     document.querySelectorAll<HTMLDivElement>(".smaller-card")
 );
-const isCategoryPage = !!document.querySelector(".disponibility-container");
+const isCategoryPage = document.querySelector(".disponibility-container");
+const backButton = document.getElementById("back-button")
 const movieGrid = document.getElementById("movie-grid");
 const previewModal = document.getElementById("preview-modal")!;
 const previewName = document.getElementById("preview-name")!;
@@ -211,6 +212,12 @@ export function assignRowCol() {
         searchBar.dataset.col = "0";
     }
 
+    if (backButton && searchBar) {
+        backButton.dataset.row = "0"
+        backButton.dataset.col = "0"
+        searchBar.dataset.col = "1"
+    }
+
     if (isCategoryPage) {
         categories.forEach((btn, i) => {
             btn.dataset.row = "1";
@@ -245,7 +252,6 @@ export function assignRowCol() {
     assignCards(containerUnavailable);
 }
 
-// third argument sus
 export function findClosest(
     targetRow: number,
     targetCol: number,

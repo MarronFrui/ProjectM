@@ -133,9 +133,10 @@ a {
 
 .card {
     display: flex;
-    min-width: 1rem;
+    min-width: 10rem;
+    min-height: 17rem;
     height: 15vw;
-    width: 8vw;
+    width: 8.3vw;
     flex-direction: column;
     background-color: grey;
     transition: transform 0.3s ease, box-shadow 0.3s ease;
@@ -154,10 +155,12 @@ a {
 
 .smaller-card {
     display: flex;
-    font-size: 1.5rem;
+    font-size: 1.5vw;
     align-items: center;
     justify-content: center;
-    width: 12vw;
+    min-width: 6rem;
+    min-height: 3rem;
+    width: 13vw;
     height: 4vw;
     border-radius: 1rem;
     background-color: grey;
