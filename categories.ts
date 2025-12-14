@@ -1,8 +1,5 @@
 import { contentDB, loadContentDB } from "./config";
-import {
-    assignRowCol,
-    menuNavigation,
-} from "./navigation";
+import { assignRowCol, menuNavigation} from "./navigation";
 
 const container = document.getElementById("category-container");
 const backButton = document.getElementById("back-button");
@@ -24,10 +21,14 @@ async function initCategories() {
         card.dataset.col = `${index}`;
         card.textContent = genre;
 
-        card.addEventListener("click", () => openFilteredMoviePage());
+        card.addEventListener("click", () => openFilteredMoviePage(genre));
+        card.addEventListener("keydown", (e) => {
+            if (e.key === "Enter"){
+                openFilteredMoviePage(genre)
+            }
+        });
 
         container?.appendChild(card);
-
     });
 
     // After cards are added, assign row/col and enable navigation
@@ -35,10 +36,9 @@ async function initCategories() {
     menuNavigation();
 }
 
-function openFilteredMoviePage() {
-    const win = window.open("", "_blank");
-    if (!win) return;
-    return;
+function openFilteredMoviePage(genre: string) {
+    const slug = encodeURIComponent(genre);
+    window.location.href = `category.html?genre=${slug}`;
 }
 
 initCategories();

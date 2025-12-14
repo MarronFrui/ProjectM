@@ -14,7 +14,7 @@ const categories = Array.from(
     document.querySelectorAll<HTMLDivElement>(".smaller-card")
 );
 const isCategoryPage = document.querySelector(".disponibility-container");
-const backButton = document.getElementById("back-button")
+const backButton = document.getElementById("back-button");
 const movieGrid = document.getElementById("movie-grid");
 const previewModal = document.getElementById("preview-modal")!;
 const previewName = document.getElementById("preview-name")!;
@@ -213,9 +213,9 @@ export function assignRowCol() {
     }
 
     if (backButton && searchBar) {
-        backButton.dataset.row = "0"
-        backButton.dataset.col = "0"
-        searchBar.dataset.col = "1"
+        backButton.dataset.row = "0";
+        backButton.dataset.col = "0";
+        searchBar.dataset.col = "1";
     }
 
     if (isCategoryPage) {
@@ -291,38 +291,37 @@ export function menuNavigation(): void {
         const focused = getFocused();
         if (!focused) return;
 
-            if (previewModal && previewModal.classList.contains("active")) {
-                const currentIndex = modalFocusableCache.indexOf(focused);
-                let nextIndex = currentIndex;
+        if (previewModal && previewModal.classList.contains("active")) {
+            const currentIndex = modalFocusableCache.indexOf(focused);
+            let nextIndex = currentIndex;
 
-                switch (e.key) {
-                    case "ArrowRight":
-                    case "ArrowDown":
-                        nextIndex =
-                            (currentIndex + 1) % modalFocusableCache.length;
-                        break;
-                    case "ArrowLeft":
-                    case "ArrowUp":
-                        nextIndex =
-                            (currentIndex - 1 + modalFocusableCache.length) %
-                            modalFocusableCache.length;
-                        break;
-                    case "Enter":
-                    case "OK":
-                        focused.click();
-                        break;
-                    case "Escape":
-                    case "Back":
-                        closePreviewModal();
-                        break;
-                    default:
-                        return;
-                }
-
-                e.preventDefault();
-                modalFocusableCache[nextIndex].focus();
-                return;
+            switch (e.key) {
+                case "ArrowRight":
+                case "ArrowDown":
+                    nextIndex = (currentIndex + 1) % modalFocusableCache.length;
+                    break;
+                case "ArrowLeft":
+                case "ArrowUp":
+                    nextIndex =
+                        (currentIndex - 1 + modalFocusableCache.length) %
+                        modalFocusableCache.length;
+                    break;
+                case "Enter":
+                case "OK":
+                    focused.click();
+                    break;
+                case "Escape":
+                case "Back":
+                    closePreviewModal();
+                    break;
+                default:
+                    return;
             }
+
+            e.preventDefault();
+            modalFocusableCache[nextIndex].focus();
+            return;
+        }
 
         const row = parseInt(focused.dataset.row!);
         const col = parseInt(focused.dataset.col!);
@@ -400,12 +399,21 @@ playButton?.addEventListener("click", () => {
 });
 
 function init() {
+    const params = new URLSearchParams(window.location.search);
+    const genre = params.get("genre");
     contentDB.forEach((item) => {
         contentItemCache[item.id] = item;
     });
 
+    if (genre) {
+        renderPage([decodeURIComponent(genre)]);
+        console.log(genre);
+    } else {
+        renderPage();
+        console.log("mauvais genre");
+    }
     assignRowCol();
-    renderPage();
+
     search();
     menuNavigation();
 }
