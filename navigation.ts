@@ -13,7 +13,6 @@ const searchBar = document.getElementById("search");
 const categories = Array.from(
     document.querySelectorAll<HTMLDivElement>(".smaller-card")
 );
-const isCategoryPage = document.querySelector(".disponibility-container");
 const backButton = document.getElementById("back-button");
 const movieGrid = document.getElementById("movie-grid");
 const previewModal = document.getElementById("preview-modal")!;
@@ -36,7 +35,7 @@ let modalActionListenersAdded = false;
 
 export type FocusableElement = HTMLElement;
 
-if (isCategoryPage && movieGrid) movieGrid.style.height = "auto";
+if (movieGrid) movieGrid.style.height = "auto";
 
 function getContentItemFromCache(id: string): ContentItem | undefined {
     return contentItemCache[id];
@@ -192,18 +191,20 @@ function renderPage(
     const available = filtered.filter((item) => item.available);
     const unavailable = filtered.filter((item) => !item.available);
 
-    if (isCategoryPage) {
+    function contentAvailability() { 
         if (containerAvailable && containerUnavailable) {
             renderCards(available, containerAvailable);
             renderCards(unavailable, containerUnavailable);
         }
-    } else {
+     else {
         if (containerAvailable) {
             renderCards(available, containerAvailable);
         }
+    }   
     }
 
     assignRowCol();
+    contentAvailability();
 }
 
 export function assignRowCol() {
@@ -218,20 +219,14 @@ export function assignRowCol() {
         searchBar.dataset.col = "1";
     }
 
-    if (isCategoryPage) {
-        categories.forEach((btn, i) => {
-            btn.dataset.row = "1";
-            btn.dataset.col = `${i}`;
-        });
-    } else {
-        categories.forEach((btn, i) => {
+    categories.forEach((btn, i) => {
             btn.dataset.row = "3";
             btn.dataset.col = `${i}`;
-        });
-    }
+    });
+
 
     const cardRows: number = 2;
-    let nextRow: number = isCategoryPage ? 2 : 1;
+    let nextRow: number = 1;
 
     function assignCards(container: HTMLElement | null): void {
         if (container === null) return;

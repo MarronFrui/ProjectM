@@ -219,14 +219,6 @@ a {
     overflow: visible;
 }
 
-.disponibility-container {
-    display: flex;
-    flex-direction: column; /* stack available/unavailable vertically */
-    gap: 1rem; /* optional spacing between sections */
-    width: 100%; /* fill the movie grid width */
-    height: 100%;
-    box-sizing: border-box;
-}
 
 .available,
 .unavailable {
