@@ -129,9 +129,9 @@ function getFocusableInModal(): FocusableElement[] {
     if (!previewModal) return [];
     return Array.from(
         previewModal.querySelectorAll<FocusableElement>(
-            "button, [href], input, select, textarea, [tabindex]:not([tabindex='-1'])"
+            "button"
         )
-    ).filter((el) => !el.hasAttribute("disabled"));
+    ).filter((el) => el.offsetParent !== null);
 }
 
 function cacheModalFocusables() {
@@ -174,7 +174,22 @@ function openPreviewModal(item: ContentItem) {
             : null;
     document.body.classList.add("preview");
     previewModal.classList.add("active");
-    playButton.focus();
+
+    const playButton = document.getElementById("play-button")!;
+    const wishlistButton = document.getElementById("add-to-wishlist")!;
+    
+    if (item.available) {
+        wishlistButton.style.display = "none";
+        playButton.style.display = "inline-block";
+        playButton.focus();
+    }
+    else {
+        playButton.style.display = "none";
+        wishlistButton.style.display = "inline-block";
+        wishlistButton.focus();
+    }
+    
+    (item.available ? playButton : wishlistButton).focus();
 
     cacheModalFocusables();
     addModalActionListeners();
@@ -302,7 +317,7 @@ export function menuNavigation(): void {
 
         if (focused === searchBar) {
             searchBar.setAttribute("autocomplete", "off");
-            if (e.key === "Enter") {
+            if (e.key === "Escape") {
                 searchBar.blur();
                 e.preventDefault();
             }
