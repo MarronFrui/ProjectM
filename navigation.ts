@@ -83,16 +83,31 @@ function renderCards(cards: ContentItem[], container: HTMLElement): void {
                 assignRowCol();
             });
             card.appendChild(likeBtn);
+            likeBtn.addEventListener("keydown", (e) => {
+                if (e.key === "Enter") {
+                    e.stopPropagation();
+                    if (!wishlist.includes(item.id)) wishlist.push(item.id);
+                    else wishlist = wishlist.filter((id) => id !== item.id);
+                    renderPage();
+                    assignRowCol();
+                }
+            });
         }
 
         if (isAvailable) {
-            const duration = document.createElement("p");
-            duration.textContent = `Duration: ${item.duration ?? "??"} min`;
-            duration.style.textAlign = "center";
-            duration.style.margin = "0.25rem 0";
-            duration.style.fontSize = "0.85rem";
-            duration.style.color = "#ccc";
-            card.appendChild(duration);
+            const info = document.createElement("p");
+            info.style.textAlign = "center";
+            info.style.margin = "0.25rem 0";
+            info.style.fontSize = "0.85rem";
+            info.style.color = "#ccc";
+
+            if (item.seasons === null) {
+                info.textContent = `Duration: ${item.duration} min`;
+            } else {
+                info.textContent = `Seasons: ${item.seasons} | Episodes: ${item.episodes}`;
+            }
+
+            card.appendChild(info);
         }
 
         container.appendChild(card);
@@ -147,11 +162,12 @@ function openPreviewModal(item: ContentItem) {
 
     previewName.textContent = item.name;
     previewDescription.textContent = item.description;
-    previewDuration.textContent = `Duration: ${item.duration} min`;
-    previewSeasonsEpisodes.textContent = item.category.includes("Serie")
-        ? `Seasons: ${item.seasons}, Episodes: ${item.episodes}`
-        : "";
-
+    if (item.seasons === null) {
+        previewDuration.textContent = `Duration: ${item.duration} min`;
+    }
+    if (item.seasons !== null) {
+        previewSeasonsEpisodes.textContent = `Seasons: ${item.seasons} | Episodes: ${item.episodes}`;
+    }
     lastFocusedElement =
         document.activeElement instanceof HTMLElement
             ? document.activeElement
@@ -191,16 +207,15 @@ function renderPage(
     const available = filtered.filter((item) => item.available);
     const unavailable = filtered.filter((item) => !item.available);
 
-    function contentAvailability() { 
+    function contentAvailability() {
         if (containerAvailable && containerUnavailable) {
             renderCards(available, containerAvailable);
             renderCards(unavailable, containerUnavailable);
+        } else {
+            if (containerAvailable) {
+                renderCards(available, containerAvailable);
+            }
         }
-     else {
-        if (containerAvailable) {
-            renderCards(available, containerAvailable);
-        }
-    }   
     }
 
     assignRowCol();
@@ -218,12 +233,6 @@ export function assignRowCol() {
         backButton.dataset.col = "0";
         searchBar.dataset.col = "1";
     }
-
-    categories.forEach((btn, i) => {
-            btn.dataset.row = "3";
-            btn.dataset.col = `${i}`;
-    });
-
 
     const cardRows: number = 2;
     let nextRow: number = 1;
@@ -245,6 +254,11 @@ export function assignRowCol() {
 
     assignCards(containerAvailable);
     assignCards(containerUnavailable);
+
+    categories.forEach((btn, i) => {
+        btn.dataset.row = `${nextRow}`;
+        btn.dataset.col = `${i}`;
+    });
 }
 
 export function findClosest(
@@ -285,6 +299,19 @@ export function menuNavigation(): void {
     document.addEventListener("keydown", (e) => {
         const focused = getFocused();
         if (!focused) return;
+
+        if (focused === searchBar) {
+            searchBar.setAttribute("autocomplete", "off");
+            if (e.key === "Enter") {
+                searchBar.blur();
+                e.preventDefault();
+            }
+            if (e.key === "ArrowDown") {
+                searchBar.blur();
+                e.preventDefault();
+            }
+            return;
+        }
 
         if (previewModal && previewModal.classList.contains("active")) {
             const currentIndex = modalFocusableCache.indexOf(focused);
@@ -367,18 +394,14 @@ export function menuNavigation(): void {
     });
 }
 
-window.addEventListener(
-    "keydown",
-    (e) => {
-        if (document.activeElement === document.body) {
-            const firstFocusable = Array.from(
-                document.querySelectorAll<FocusableElement>('[tabindex="0"]')
-            ).find((el) => el.id !== "search");
-            if (firstFocusable) firstFocusable.focus();
-        }
-    },
-    { once: true }
-);
+window.addEventListener("keydown", (e) => {
+    if (document.activeElement === document.body) {
+        const firstFocusable = Array.from(
+            document.querySelectorAll<FocusableElement>('[tabindex="0"]')
+        ).find((el) => el.id !== "search");
+        if (firstFocusable) firstFocusable.focus();
+    }
+});
 
 closePreviewButton?.addEventListener("click", () => {
     closePreviewModal();
@@ -396,19 +419,22 @@ playButton?.addEventListener("click", () => {
 function init() {
     const params = new URLSearchParams(window.location.search);
     const genre = params.get("genre");
+
+    //temporary placeholder to simulate availabilty
+    contentDB.forEach((item) => {
+        item.available = Math.random() > 0.3;
+    });
+
     contentDB.forEach((item) => {
         contentItemCache[item.id] = item;
     });
 
     if (genre) {
         renderPage([decodeURIComponent(genre)]);
-        console.log(genre);
     } else {
         renderPage();
-        console.log("mauvais genre");
     }
     assignRowCol();
-
     search();
     menuNavigation();
 }

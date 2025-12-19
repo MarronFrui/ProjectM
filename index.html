@@ -17,11 +17,14 @@
 
   <main id="movie-grid">
     <div class="carousel-container">
-      <div class="carousel-wrapper">
-        <button id="scroll-btn-left" class="scroll-btn scroll-btn-left">&#8592;</button>
-        <div id="card-container"></div>
-        <button id="scroll-btn-right" class="scroll-btn scroll-btn-right">&#8594;</button>
-      </div>
+      <section class="available">
+        <h2>Available</h2>
+        <div class="card-container" id="available-cards"></div>
+      </section>
+      <section class="unavailable">
+        <h2>Unavailable</h2>
+        <div class="card-container" id="unavailable-cards"></div>
+      </section>
     </div>
   </main>
 
@@ -34,6 +37,7 @@
       <p id="preview-duration"></p>
       <p id="preview-seasons-episodes"></p>
       <button id="play-button">Play</button>
+      <button id="add-to-whishlist">Add to whishlist</button>
     </div>
   </div>
 
@@ -41,6 +45,7 @@
     <h2>Categories</h2>
     <div class="carousel-container">
       <div class="smaller-card-container">
+        <div class="smaller-card" tabindex="0"><a href="index.html">Home</a></div>
         <div class="smaller-card" tabindex="0"><a href="categories.html">Categories</a></div>
         <div class="smaller-card" tabindex="0"><a href="whishlist.html">Whishlist</a></div>
       </div>
