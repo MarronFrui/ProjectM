@@ -5,6 +5,32 @@ const container = document.getElementById("category-container");
 const backButton = document.getElementById("back-button");
 
 backButton?.addEventListener("click", () => history.back());
+backButton?.addEventListener("keydown", (e) => {
+  if (e.key === "Enter") history.back();
+});
+
+function assignCategoryRows(container: HTMLElement) {
+    const categoryCards = Array.from(container.children) as HTMLElement[];
+    const tolerance = 4;
+
+    let currentRow = 0;
+    let lastTop = -Infinity;
+    let col = 0;
+
+    categoryCards.forEach(card => {
+        const top = card.getBoundingClientRect().top;
+
+        if (Math.abs(top - lastTop) > tolerance) {
+            currentRow++;
+            col = 0;
+            lastTop = top;
+        }
+
+        card.dataset.row = currentRow.toString();
+        card.dataset.col = col.toString();
+        col++;
+    });
+}
 
 async function initCategories() {
     await loadContentDB();
@@ -31,7 +57,10 @@ async function initCategories() {
         container?.appendChild(card);
     });
 
-    // After cards are added, assign row/col and enable navigation
+        if (container) {
+        assignCategoryRows(container);
+    }
+
     assignRowCol();
     menuNavigation();
 }
