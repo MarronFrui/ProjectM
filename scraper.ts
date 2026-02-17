@@ -1,7 +1,7 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { Buffer } from "node:buffer";
-import keyConfig from "./apikey.json" assert { type: "json" };
+import keyConfig from "./apikey.json" with { type: "json" };
 import { ContentItem } from "./config";
 
 const API_KEY = keyConfig.API_KEY;
