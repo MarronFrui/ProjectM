@@ -41,79 +41,6 @@ function getContentItemFromCache(id: string): ContentItem | undefined {
     return contentItemCache[id];
 }
 
-function renderCards(cards: ContentItem[], container: HTMLElement): void {
-    if (!container) return;
-    container.innerHTML = "";
-
-    const isUnavailable = container === containerUnavailable;
-    const isAvailable = container === containerAvailable;
-
-    cards.forEach((item) => {
-        const card = document.createElement("div");
-        card.className = "card";
-        card.tabIndex = 0;
-        card.dataset.id = item.id;
-
-        const img = document.createElement("img");
-        img.src = item.poster ?? "./content-info/poster/default.jpg";
-        img.alt = item.name;
-        img.style.width = "100%";
-        img.style.height = "75%";
-        img.style.objectFit = "cover";
-        card.appendChild(img);
-
-        const title = document.createElement("h3");
-        title.textContent = item.name;
-        title.style.textAlign = "center";
-        title.style.margin = "0.5rem 0";
-        card.appendChild(title);
-
-        card.addEventListener("click", () => {
-            openPreviewModal(item);
-        });
-
-        if (isUnavailable) {
-            const likeBtn = document.createElement("button");
-            likeBtn.textContent = wishlist.includes(item.id) ? "♥" : "♡";
-            likeBtn.addEventListener("click", (e) => {
-                e.stopPropagation();
-                if (!wishlist.includes(item.id)) wishlist.push(item.id);
-                else wishlist = wishlist.filter((id) => id !== item.id);
-                renderPage();
-                assignRowCol();
-            });
-            card.appendChild(likeBtn);
-            likeBtn.addEventListener("keydown", (e) => {
-                if (e.key === "Enter") {
-                    e.stopPropagation();
-                    if (!wishlist.includes(item.id)) wishlist.push(item.id);
-                    else wishlist = wishlist.filter((id) => id !== item.id);
-                    renderPage();
-                    assignRowCol();
-                }
-            });
-        }
-
-        if (isAvailable) {
-            const info = document.createElement("p");
-            info.style.textAlign = "center";
-            info.style.margin = "0.25rem 0";
-            info.style.fontSize = "0.85rem";
-            info.style.color = "#ccc";
-
-            if (item.seasons === null) {
-                info.textContent = `Duration: ${item.duration} min`;
-            } else {
-                info.textContent = `Seasons: ${item.seasons} | Episodes: ${item.episodes}`;
-            }
-
-            card.appendChild(info);
-        }
-
-        container.appendChild(card);
-    });
-}
-
 function search(): void {
     if (!searchBar) {
         return;
@@ -235,6 +162,79 @@ function renderPage(
 
     assignRowCol();
     contentAvailability();
+}
+
+export function renderCards(cards: ContentItem[], container: HTMLElement): void {
+    if (!container) return;
+    container.innerHTML = "";
+
+    const isUnavailable = container === containerUnavailable;
+    const isAvailable = container === containerAvailable;
+
+    cards.forEach((item) => {
+        const card = document.createElement("div");
+        card.className = "card";
+        card.tabIndex = 0;
+        card.dataset.id = item.id;
+
+        const img = document.createElement("img");
+        img.src = item.poster ?? "./content-info/poster/default.jpg";
+        img.alt = item.name;
+        img.style.width = "100%";
+        img.style.height = "75%";
+        img.style.objectFit = "cover";
+        card.appendChild(img);
+
+        const title = document.createElement("h3");
+        title.textContent = item.name;
+        title.style.textAlign = "center";
+        title.style.margin = "0.5rem 0";
+        card.appendChild(title);
+
+        card.addEventListener("click", () => {
+            openPreviewModal(item);
+        });
+
+        if (isUnavailable) {
+            const likeBtn = document.createElement("button");
+            likeBtn.textContent = wishlist.includes(item.id) ? "♥" : "♡";
+            likeBtn.addEventListener("click", (e) => {
+                e.stopPropagation();
+                if (!wishlist.includes(item.id)) wishlist.push(item.id);
+                else wishlist = wishlist.filter((id) => id !== item.id);
+                renderPage();
+                assignRowCol();
+            });
+            card.appendChild(likeBtn);
+            likeBtn.addEventListener("keydown", (e) => {
+                if (e.key === "Enter") {
+                    e.stopPropagation();
+                    if (!wishlist.includes(item.id)) wishlist.push(item.id);
+                    else wishlist = wishlist.filter((id) => id !== item.id);
+                    renderPage();
+                    assignRowCol();
+                }
+            });
+        }
+
+        if (isAvailable) {
+            const info = document.createElement("p");
+            info.style.textAlign = "center";
+            info.style.margin = "0.25rem 0";
+            info.style.fontSize = "0.85rem";
+            info.style.color = "#ccc";
+
+            if (item.seasons === null) {
+                info.textContent = `Duration: ${item.duration} min`;
+            } else {
+                info.textContent = `Seasons: ${item.seasons} | Episodes: ${item.episodes}`;
+            }
+
+            card.appendChild(info);
+        }
+
+        container.appendChild(card);
+    });
 }
 
 export function assignRowCol() {

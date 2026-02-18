@@ -7,53 +7,7 @@
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <header>
-    <h1>Homemade Netflix</h1>
-  </header>
-
-  <div class="search-container">
-    <input class="search-bar" type="text" id="search" placeholder="Search movies..." tabindex="0" />
-  </div>
-
-  <main id="movie-grid">
-    <div class="carousel-container">
-      <section class="available">
-        <h2>Available</h2>
-        <div class="card-container" id="available-cards"></div>
-      </section>
-      <section class="unavailable">
-        <h2>Unavailable</h2>
-        <div class="card-container" id="unavailable-cards"></div>
-      </section>
-    </div>
-  </main>
-
-  <div class="preview" id="preview-modal">
-    <div id="preview-content">
-      <button id="close-preview">✖</button>
-      <img id="preview-image" src="" alt="" />
-      <h3 id="preview-name"></h3>
-      <p id="preview-description"></p>
-      <p id="preview-duration"></p>
-      <p id="preview-seasons-episodes"></p>
-      <div class="preview-actions">
-        <button id="play-button">Play</button>
-        <button id="add-to-wishlist">Add to whishlist</button>
-      </div>
-    </div>
-  </div>
-
-  <section class="categorie">
-    <h2>Categories</h2>
-    <div class="carousel-container">
-      <div class="smaller-card-container">
-        <div class="smaller-card" tabindex="0"><a href="index.html">Home</a></div>
-        <div class="smaller-card" tabindex="0"><a href="categories.html">Categories</a></div>
-        <div class="smaller-card" tabindex="0"><a href="whishlist.html">Whishlist</a></div>
-      </div>
-    </div>
-  </section>
-
-  <script type="module" src="index.ts"></script>
+  <div id="app"></div>
+  <script type="module" src="index.tsx"></script>
 </body>
 </html>
