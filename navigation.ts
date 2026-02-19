@@ -11,19 +11,19 @@ const containerAvailable =
 const containerUnavailable = document.getElementById("unavailable-cards");
 const searchBar = document.getElementById("search");
 const categories = Array.from(
-    document.querySelectorAll<HTMLDivElement>(".smaller-card")
+    document.querySelectorAll<HTMLDivElement>(".smaller-card"),
 );
 const backButton = document.getElementById("back-button");
 const movieGrid = document.getElementById("movie-grid");
 const previewModal = document.getElementById("preview-modal")!;
 const previewName = document.getElementById("preview-name")!;
 const previewImage = document.getElementById(
-    "preview-image"
+    "preview-image",
 ) as HTMLImageElement;
 const previewDescription = document.getElementById("preview-description")!;
 const previewDuration = document.getElementById("preview-duration")!;
 const previewSeasonsEpisodes = document.getElementById(
-    "preview-seasons-episodes"
+    "preview-seasons-episodes",
 )!;
 const playButton = document.getElementById("play-button")!;
 const closePreviewButton = document.getElementById("close-preview")!;
@@ -55,9 +55,7 @@ function search(): void {
 function getFocusableInModal(): FocusableElement[] {
     if (!previewModal) return [];
     return Array.from(
-        previewModal.querySelectorAll<FocusableElement>(
-            "button"
-        )
+        previewModal.querySelectorAll<FocusableElement>("button"),
     ).filter((el) => el.offsetParent !== null);
 }
 
@@ -79,6 +77,7 @@ function addModalActionListeners() {
 
 function openPreviewModal(item: ContentItem) {
     const card = document.querySelector(`.card[data-id='${item.id}']`);
+    if (!card) return;
     if (card) {
         const imgEl = card.querySelector("img");
         previewImage.src = imgEl
@@ -104,18 +103,17 @@ function openPreviewModal(item: ContentItem) {
 
     const playButton = document.getElementById("play-button")!;
     const wishlistButton = document.getElementById("add-to-wishlist")!;
-    
+
     if (item.available) {
         wishlistButton.style.display = "none";
         playButton.style.display = "inline-block";
         playButton.focus();
-    }
-    else {
+    } else {
         playButton.style.display = "none";
         wishlistButton.style.display = "inline-block";
         wishlistButton.focus();
     }
-    
+
     (item.available ? playButton : wishlistButton).focus();
 
     cacheModalFocusables();
@@ -130,19 +128,19 @@ function closePreviewModal() {
 
 function renderPage(
     filterCategory: ContentItem["category"] | null = null,
-    filterSearch = ""
+    filterSearch = "",
 ) {
     let filtered = contentDB;
 
     if (filterCategory && filterCategory.length > 0) {
         filtered = filtered.filter((item) =>
-            item.category.some((cat) => filterCategory.includes(cat))
+            item.category.some((cat) => filterCategory.includes(cat)),
         );
     }
 
     if (filterSearch) {
         filtered = filtered.filter((item) =>
-            item.name.toLowerCase().includes(filterSearch.toLowerCase())
+            item.name.toLowerCase().includes(filterSearch.toLowerCase()),
         );
     }
 
@@ -164,18 +162,27 @@ function renderPage(
     contentAvailability();
 }
 
-export function renderCards(cards: ContentItem[], container: HTMLElement): void {
+export function renderCards(
+    cards: ContentItem[],
+    container: HTMLElement,
+): void {
     if (!container) return;
     container.innerHTML = "";
-
-    const isUnavailable = container === containerUnavailable;
-    const isAvailable = container === containerAvailable;
+    
+    const isUnavailable = container.id === 'unavailable-cards';
+    const isAvailable = container.id === 'available-cards';
 
     cards.forEach((item) => {
         const card = document.createElement("div");
         card.className = "card";
         card.tabIndex = 0;
         card.dataset.id = item.id;
+
+        card.addEventListener("click", (e) => {
+            console.log("ITEM DATA:", item); // DEBUG TEMP FUCK YOU
+            openPreviewModal(item);
+            e.stopPropagation();
+        });
 
         const img = document.createElement("img");
         img.src = item.poster ?? "./content-info/poster/default.jpg";
@@ -256,7 +263,7 @@ export function assignRowCol() {
         if (container === null) return;
 
         const cards = Array.from(container.children).filter(
-            (el): el is HTMLDivElement => el.tagName === "DIV"
+            (el): el is HTMLDivElement => el.tagName === "DIV",
         ); // Make sure all cards are div
 
         cards.forEach((card, i) => {
@@ -279,15 +286,15 @@ export function assignRowCol() {
 export function findClosest(
     targetRow: number,
     targetCol: number,
-    root: Document | HTMLElement = document
+    root: Document | HTMLElement = document,
 ): FocusableElement | null {
     let el = root.querySelector<FocusableElement>(
-        `[data-row='${targetRow}'][data-col='${targetCol}']`
+        `[data-row='${targetRow}'][data-col='${targetCol}']`,
     );
     if (el) return el;
 
     const rowEls = Array.from(
-        root.querySelectorAll<FocusableElement>(`[data-row='${targetRow}']`)
+        root.querySelectorAll<FocusableElement>(`[data-row='${targetRow}']`),
     );
     if (!rowEls.length) return null;
 
@@ -376,13 +383,13 @@ export function menuNavigation(): void {
             case "ArrowLeft":
                 next =
                     document.querySelector<FocusableElement>(
-                        `[data-row='${row}'][data-col='${col - 1}']`
+                        `[data-row='${row}'][data-col='${col - 1}']`,
                     ) || findClosest(row, 0);
                 break;
             case "ArrowRight":
                 next =
                     document.querySelector<FocusableElement>(
-                        `[data-row='${row}'][data-col='${col + 1}']`
+                        `[data-row='${row}'][data-col='${col + 1}']`,
                     ) || findClosest(row, 0);
                 break;
             case "Enter":
@@ -412,10 +419,11 @@ export function menuNavigation(): void {
 window.addEventListener("keydown", (e) => {
     if (document.activeElement === document.body) {
         const firstFocusable = Array.from(
-            document.querySelectorAll<FocusableElement>('[tabindex="0"]')
+            document.querySelectorAll<FocusableElement>('[tabindex="0"]'),
         ).find((el) => el.id !== "search");
         if (firstFocusable) firstFocusable.focus();
     }
+    e.stopPropagation();
 });
 
 closePreviewButton?.addEventListener("click", () => {
