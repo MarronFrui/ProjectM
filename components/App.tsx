@@ -1,11 +1,19 @@
 // App.tsx
-import { contentDB } from '../config';
+import { contentDB, ContentItem } from '../config';
 import CardsContainer from './RenderCards';
-
-const availableCards = contentDB.filter(item => item.available);
-const unavailableCards = contentDB.filter(item => !item.available);
+import { useState, useEffect } from 'react';
 
 export default function App() {
+  const [availableCards, setAvailableCards] = useState<ContentItem[]>([]);
+  const [unavailableCards, setUnavailableCards] = useState<ContentItem[]>([]);  
+
+  useEffect(() => {
+    const available = contentDB.filter(item => item.available); 
+    const unavailable = contentDB.filter(item => !item.available);  
+    setAvailableCards(available);
+    setUnavailableCards(unavailable);
+  }, []);
+
   return (
     <>
       <header>
