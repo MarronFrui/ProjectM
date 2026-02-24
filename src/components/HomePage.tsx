@@ -39,11 +39,14 @@ export default function HomePage() {
                 <h1>Homemade Netflix</h1>
             </header>
 
-            <input
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search..."
-            />
+            <div className="search-container">
+                <input
+                    id="search"
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    placeholder="Search..."
+                />
+            </div>
 
             <h2>Available</h2>
             <CardsGrid
