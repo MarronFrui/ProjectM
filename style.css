@@ -159,6 +159,46 @@ a {
     text-overflow: ellipsis;
 }
 
+.card h3 {
+    text-align: center;
+    margin: 0.3rem 0;
+    font-size: 0.95rem;
+    flex-shrink: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+.card p {
+    text-align: center;
+    margin: 0.2rem 0;
+    font-size: 0.85rem;
+    color: #ccc;
+    flex-shrink: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+.card button {
+    margin: 0.25rem auto;
+    padding: 0.3rem 0.6rem;
+    border-radius: 0.25rem;
+    font-size: 0.95rem;
+    background-color: #e50914;
+    color: white;
+    border: none;
+    cursor: pointer;
+}
+
+
+.card img {
+    width: 100%;
+    height: 75%;       
+    object-fit: cover; 
+    flex-shrink: 0;    
+}
+
 .smaller-card {
     display: flex;
     font-size: 1.5vw;
@@ -228,19 +268,19 @@ a {
 .available,
 .unavailable {
     display: flex;
-    flex-direction: column; /* stack cards vertically inside each section */
-    flex: 1; /* allow sections to grow equally */
-    width: 100%; /* fill container width */
+    flex-direction: column; 
+    flex: 1; 
+    width: 100%; 
 }
 
 .available h2,
 .unavailable h2 {
-    margin-left: 4rem; /* optional: align titles nicely */
+    margin-left: 4rem; 
 }
 
 .card-container {
     display: grid;
-    grid-template-rows: repeat(2, 18rem); /* same as before */
+    grid-template-rows: repeat(2, 18rem); 
     grid-auto-flow: column;
     grid-auto-columns: 10rem;
     gap: 1rem;
