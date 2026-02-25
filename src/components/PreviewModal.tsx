@@ -14,25 +14,52 @@ export default function PreviewModal({
 }) {
   const navigate = useNavigate();
 
-  return (
-    <div className="preview active">
-      <button onClick={onClose}>✖</button>
-
-      <img src={item.poster} alt={item.name} />
-      <h3>{item.name}</h3>
-      <p>{item.description}</p>
-
-      {item.available ? (
-        <button onClick={() => navigate(`/player/${item.id}`)}>
-          Play
+return (
+    <div id="preview-modal" className="active">
+      <div id="preview-content">
+        <button id="close-preview" onClick={onClose}>
+          ✖
         </button>
-      ) : (
-        <button onClick={() => toggleWishlist(item.id)}>
-          {wishlist.includes(item.id)
-            ? "Remove from wishlist"
-            : "Add to wishlist"}
-        </button>
-      )}
+
+        <img
+          id="preview-image"
+          src={item.poster}
+          alt={item.name}
+        />
+
+        <h3 id="preview-name">{item.name}</h3>
+
+        <p id="preview-description">{item.description}</p>
+
+        {item.seasons === null ? (
+          <p id="preview-duration">
+            Duration: {item.duration} min
+          </p>
+        ) : (
+          <p id="preview-seasons-episodes">
+            Seasons: {item.seasons} | Episodes: {item.episodes}
+          </p>
+        )}
+
+        {item.available ? (
+          <button
+            id="play-button"
+            onClick={() => navigate(`/player/${item.id}`)}
+          >
+            Play
+          </button>
+        ) : (
+          <button
+            id="add-to-wishlist"
+            style={{ display: "inline-block" }}
+            onClick={() => toggleWishlist(item.id)}
+          >
+            {wishlist.includes(item.id)
+              ? "Remove from wishlist"
+              : "Add to wishlist"}
+          </button>
+        )}
+      </div>
     </div>
   );
 }
