@@ -1,13 +1,17 @@
+import { useParams } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { loadContentDB, ContentItem } from "../../config";
 import CardsGrid from "./CardsGrid";
 import PreviewModal from "./PreviewModal";
+import Menu from "../components/Menu";
+
 
 export default function HomePage() {
     const [content, setContent] = useState<ContentItem[]>([]);
     const [search, setSearch] = useState("");
     const [selected, setSelected] = useState<ContentItem | null>(null);
     const [wishlist, setWishlist] = useState<string[]>([]);
+    const { genre } = useParams();
 
     useEffect(() => {
         loadContentDB().then((items) =>
@@ -20,10 +24,15 @@ export default function HomePage() {
         );
     }, []);
 
-    const filtered = content.filter((item) =>
-        item.name.toLowerCase().includes(search.toLowerCase()),
-    );
+    const filtered = content.filter((item) => {
+    const matchesSearch =
+        item.name.toLowerCase().includes(search.toLowerCase());
 
+    const matchesGenre =
+        genre ? item.category.includes(decodeURIComponent(genre)) : true;
+
+    return matchesSearch && matchesGenre;
+});
     const available = filtered.filter((i) => i.available);
     const unavailable = filtered.filter((i) => !i.available);
 
@@ -72,6 +81,7 @@ export default function HomePage() {
                     toggleWishlist={toggleWishlist}
                 />
             )}
+             <Menu />
         </>
     );
 }

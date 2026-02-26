@@ -5,14 +5,15 @@ import WishlistPage from "./WishlistPage";
 import PlayerPage from "./PlayerPage";
 
 export default function App() {
-  return (
-    <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<HomePage />} />
-        <Route path="/category/:genre" element={<CategoryPage />} />
-        <Route path="/wishlist" element={<WishlistPage />} />
-        <Route path="/player/:id" element={<PlayerPage />} />
-      </Routes>
-    </BrowserRouter>
-  );
+    return (
+        <BrowserRouter>
+            <Routes>
+                <Route path="/" element={<HomePage />} />
+                <Route path="/categories" element={<CategoryPage />} />
+                <Route path="/category/:genre" element={<HomePage />} />
+                <Route path="/wishlist" element={<WishlistPage />} />
+                <Route path="/player/:id" element={<PlayerPage />} />
+            </Routes>
+        </BrowserRouter>
+    );
 }
