@@ -120,7 +120,8 @@ a {
 
 .smaller-card-container,
 .smaller-card-container-categories {
-    margin-left: 5rem;
+    margin-left: 3rem;
+    margin-bottom: 1rem;
     display: flex;
     padding: 0.3rem;
     flex-direction: row;

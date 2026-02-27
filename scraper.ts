@@ -13,7 +13,7 @@ const OUTPUT_FILE = "./content-info/contentDB.json";
 const SKIPPED_FILE = "./content-info/skipped.txt";
 
 const TOP_RATED_LIMIT = 500; // First X ammount of content are sorted by review
-const DISCOVERY_LIMIT = 1000;  // Then fallback to release date prioritization
+const DISCOVERY_LIMIT = 1000; // Then fallback to release date prioritization
 
 const TMDB_IMAGE_BASE = "https://image.tmdb.org/t/p/original";
 
@@ -124,22 +124,21 @@ async function fetchAndBuildItem(c: Candidate): Promise<ContentItem | null> {
             duration = details.runtime ?? 0;
             if (duration < 60) {
                 console.log(
-                    `Skipping ${c.title}: film too short (${duration} min)`
+                    `Skipping ${c.title}: film too short (${duration} min)`,
                 );
                 addSkipped(key);
                 return null;
             }
             if (duration > 300) {
                 console.log(
-                    `Skipping ${c.title}: film too long (${duration} min)`
+                    `Skipping ${c.title}: film too long (${duration} min)`,
                 );
                 addSkipped(key);
                 return null;
             }
-
         } else {
             const runtimes = (details.episode_run_time ?? []).filter(
-                (r: number) => r > 0
+                (r: number) => r > 0,
             );
             const avgEpisodeDuration = runtimes.length
                 ? runtimes.reduce((a: number, b: number) => a + b, 0) /
@@ -150,7 +149,7 @@ async function fetchAndBuildItem(c: Candidate): Promise<ContentItem | null> {
 
             if (duration < 20) {
                 console.log(
-                    `Skipping ${c.title}: series too short (${duration} min)`
+                    `Skipping ${c.title}: series too short (${duration} min)`,
                 );
                 addSkipped(key);
                 return null;
@@ -171,11 +170,14 @@ async function fetchAndBuildItem(c: Candidate): Promise<ContentItem | null> {
             return null;
         }
 
-        const posterPath = path.join(POSTER_DIR, `${c.id}.jpg`);
+        const posterFilePath = path.join(POSTER_DIR, `${c.id}.jpg`);
+        const publicPosterPath = `/content-info/poster/${c.id}.jpg`;
+
         const posterUrl = details.poster_path
             ? `${TMDB_IMAGE_BASE}${details.poster_path}`
             : null;
-        if (!posterUrl || !(await downloadPoster(posterUrl, posterPath))) {
+
+        if (!posterUrl || !(await downloadPoster(posterUrl, posterFilePath))) {
             console.log(`Skipping ${c.title}: poster download failed`);
             addSkipped(key);
             return null;
@@ -194,16 +196,16 @@ async function fetchAndBuildItem(c: Candidate): Promise<ContentItem | null> {
             available: true,
             duration,
             rating,
-            seasons: c.type === "tv" ? details.number_of_seasons ?? 1 : null,
+            seasons: c.type === "tv" ? (details.number_of_seasons ?? 1) : null,
             episodes:
-                c.type === "tv" ? details.number_of_episodes ?? null : null,
-            poster: posterPath,
+                c.type === "tv" ? (details.number_of_episodes ?? null) : null,
+            poster: publicPosterPath,
             releaseYear: parseInt(
                 (details.release_date ?? details.first_air_date ?? "0").slice(
                     0,
-                    4
+                    4,
                 ),
-                10
+                10,
             ),
         };
 
@@ -232,7 +234,9 @@ async function runPhase(phase: Phase, phaseLimit: number) {
             const item = await fetchAndBuildItem(c);
             if (item) {
                 added++;
-                console.log(`Added: ${item.name} (${item.id}) [phase=${phase}]`);
+                console.log(
+                    `Added: ${item.name} (${item.id}) [phase=${phase}]`,
+                );
             }
             if (added >= phaseLimit) break;
         }
