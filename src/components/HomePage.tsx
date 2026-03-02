@@ -4,7 +4,7 @@ import { loadContentDB, ContentItem } from "../../config";
 import CardsGrid from "./CardsGrid";
 import PreviewModal from "./PreviewModal";
 import Menu from "../components/Menu";
-
+import { useDirectionalNavigation } from "../../hooks/useDirectionalNavigation";
 
 export default function HomePage() {
     const [content, setContent] = useState<ContentItem[]>([]);
@@ -12,6 +12,7 @@ export default function HomePage() {
     const [selected, setSelected] = useState<ContentItem | null>(null);
     const [wishlist, setWishlist] = useState<string[]>([]);
     const { genre } = useParams();
+    const { register } = useDirectionalNavigation();
 
     useEffect(() => {
         loadContentDB().then((items) =>
@@ -25,14 +26,16 @@ export default function HomePage() {
     }, []);
 
     const filtered = content.filter((item) => {
-    const matchesSearch =
-        item.name.toLowerCase().includes(search.toLowerCase());
+        const matchesSearch = item.name
+            .toLowerCase()
+            .includes(search.toLowerCase());
 
-    const matchesGenre =
-        genre ? item.category.includes(decodeURIComponent(genre)) : true;
+        const matchesGenre = genre
+            ? item.category.includes(decodeURIComponent(genre))
+            : true;
 
-    return matchesSearch && matchesGenre;
-});
+        return matchesSearch && matchesGenre;
+    });
     const available = filtered.filter((i) => i.available);
     const unavailable = filtered.filter((i) => !i.available);
 
@@ -47,7 +50,6 @@ export default function HomePage() {
             <header>
                 <h1>Homemade Netflix</h1>
             </header>
-
             <div className="search-container">
                 <input
                     id="search"
@@ -56,23 +58,25 @@ export default function HomePage() {
                     placeholder="Search..."
                 />
             </div>
-
             <h2>Available</h2>
-            <CardsGrid
-                items={available}
-                onSelect={setSelected}
-                wishlist={wishlist}
-                toggleWishlist={toggleWishlist}
-            />
-
+            <>
+                <CardsGrid
+                    items={available}
+                    onSelect={setSelected}
+                    wishlist={wishlist}
+                    toggleWishlist={toggleWishlist}
+                    register={register}
+                />
             <h2>Unavailable</h2>
-            <CardsGrid
-                items={unavailable}
-                onSelect={setSelected}
-                wishlist={wishlist}
-                toggleWishlist={toggleWishlist}
-            />
+                <CardsGrid
+                    items={unavailable}
+                    onSelect={setSelected}
+                    wishlist={wishlist}
+                    toggleWishlist={toggleWishlist}
+                    register={register}
+                />
 
+            </>
             {selected && (
                 <PreviewModal
                     item={selected}
@@ -81,7 +85,7 @@ export default function HomePage() {
                     toggleWishlist={toggleWishlist}
                 />
             )}
-             <Menu />
+            <Menu />
         </>
     );
 }

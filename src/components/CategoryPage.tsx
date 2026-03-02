@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { loadContentDB, ContentItem } from "../../config";
+import { useDirectionalNavigation } from "../../hooks/useDirectionalNavigation";
 
 export default function CategoryPage() {
   const [genres, setGenres] = useState<string[]>([]);
   const navigate = useNavigate();
+  const { register } = useDirectionalNavigation(); // <-- hook
 
   useEffect(() => {
     async function fetchGenres() {
@@ -27,16 +29,13 @@ export default function CategoryPage() {
   return (
     <>
       <header>
-
         <h1>Select a Genre</h1>
       </header>
 
-              <button
-          id="back-button"
-          onClick={() => navigate(-1)}
-        >
-          ← Back
-        </button>
+      <button id="back-button" ref={register} onClick={() => navigate(-1)}>
+        ← Back
+      </button>
+
       <div className="carousel-container">
         <div className="smaller-card-container-categories">
           {genres.map((genre) => (
@@ -44,6 +43,7 @@ export default function CategoryPage() {
               key={genre}
               className="smaller-card"
               tabIndex={0}
+              ref={register}
               onClick={() => openGenre(genre)}
               onKeyDown={(e) => {
                 if (e.key === "Enter") openGenre(genre);
