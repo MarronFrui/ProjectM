@@ -6,7 +6,8 @@ interface Props {
   onSelect: (item: ContentItem) => void;
   wishlist: string[];
   toggleWishlist: (id: string) => void;
-  register: (el: HTMLElement | null) => void;
+  register: (id: string | undefined, el: HTMLElement | null, row: number, col: number) => void; // ← fix this line
+  baseRow: number;
 }
 
 export default function CardsGrid({
@@ -15,19 +16,27 @@ export default function CardsGrid({
   wishlist,
   toggleWishlist,
   register,
+  baseRow,
 }: Props) {
+  const cardRows = 2;
+
   return (
     <div className="card-container">
-      {items.map((item) => (
-        <Card
-          key={item.id}
-          item={item}
-          onSelect={() => onSelect(item)}
-          wishlist={wishlist}
-          toggleWishlist={toggleWishlist}
-          ref={register}
-        />
-      ))}
+      {items.map((item, i) => {
+        const row = (i % cardRows) + baseRow;
+        const col = Math.floor(i / cardRows);
+
+        return (
+          <Card
+            key={item.id}
+            item={item}
+            onSelect={() => onSelect(item)}
+            wishlist={wishlist}
+            toggleWishlist={toggleWishlist}
+            ref={(el) => register(item.id, el, row, col)}
+          />
+        );
+      })}
     </div>
   );
 }

@@ -12,7 +12,7 @@ export default function HomePage() {
     const [selected, setSelected] = useState<ContentItem | null>(null);
     const [wishlist, setWishlist] = useState<string[]>([]);
     const { genre } = useParams();
-    const { register } = useDirectionalNavigation();
+    const { register, setModalOpen } = useDirectionalNavigation();
 
     useEffect(() => {
         loadContentDB().then((items) =>
@@ -29,20 +29,32 @@ export default function HomePage() {
         const matchesSearch = item.name
             .toLowerCase()
             .includes(search.toLowerCase());
-
         const matchesGenre = genre
             ? item.category.includes(decodeURIComponent(genre))
             : true;
-
         return matchesSearch && matchesGenre;
     });
+
     const available = filtered.filter((i) => i.available);
     const unavailable = filtered.filter((i) => !i.available);
+    const CARD_ROWS = 2;
+    const availableRowCount = available.length > 0 ? CARD_ROWS : 0;
+    const unavailableBaseRow = 1 + availableRowCount; 
 
     const toggleWishlist = (id: string) => {
         setWishlist((prev) =>
             prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id],
         );
+    };
+
+    const handleSelect = (item: ContentItem) => {
+        setSelected(item);
+        setModalOpen(true);
+    };
+
+    const handleClose = () => {
+        setSelected(null);
+        setModalOpen(false); // focus returns to lastFocusedRef automatically
     };
 
     return (
@@ -58,29 +70,31 @@ export default function HomePage() {
                     placeholder="Search..."
                 />
             </div>
-            <h2>Available</h2>
-            <>
-                <CardsGrid
-                    items={available}
-                    onSelect={setSelected}
-                    wishlist={wishlist}
-                    toggleWishlist={toggleWishlist}
-                    register={register}
-                />
-            <h2>Unavailable</h2>
-                <CardsGrid
-                    items={unavailable}
-                    onSelect={setSelected}
-                    wishlist={wishlist}
-                    toggleWishlist={toggleWishlist}
-                    register={register}
-                />
 
-            </>
+            <h2>Available</h2>
+            <CardsGrid
+                items={available}
+                onSelect={handleSelect}
+                wishlist={wishlist}
+                toggleWishlist={toggleWishlist}
+                register={register}
+                baseRow={1}
+            />
+
+            <h2>Unavailable</h2>
+            <CardsGrid
+                items={unavailable}
+                onSelect={handleSelect}
+                wishlist={wishlist}
+                toggleWishlist={toggleWishlist}
+                register={register}
+                baseRow={unavailableBaseRow}
+            />
+
             {selected && (
                 <PreviewModal
                     item={selected}
-                    onClose={() => setSelected(null)}
+                    onClose={handleClose}
                     wishlist={wishlist}
                     toggleWishlist={toggleWishlist}
                 />
