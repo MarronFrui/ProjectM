@@ -6,7 +6,7 @@ import { useDirectionalNavigation } from "../../hooks/useDirectionalNavigation";
 export default function CategoryPage() {
     const [genres, setGenres] = useState<string[]>([]);
     const navigate = useNavigate();
-    const { register } = useDirectionalNavigation();
+    const { register, focusFirst } = useDirectionalNavigation();
 
     useEffect(() => {
         async function fetchGenres() {
@@ -21,6 +21,12 @@ export default function CategoryPage() {
 
         fetchGenres();
     }, []);
+
+    useEffect(() => {
+        if (genres.length > 0) {
+            setTimeout(focusFirst, 0);
+        }
+    }, [genres]);
 
     const openGenre = (genre: string) => {
         navigate(`/category/${encodeURIComponent(genre)}`);

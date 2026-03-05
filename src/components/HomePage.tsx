@@ -12,18 +12,24 @@ export default function HomePage() {
     const [selected, setSelected] = useState<ContentItem | null>(null);
     const [wishlist, setWishlist] = useState<string[]>([]);
     const { genre } = useParams();
-    const { register, setModalOpen } = useDirectionalNavigation();
+    const {
+        register,
+        setModalOpen,
+        focusFirst,
+        setEscapeHandler,
+        registerModal,
+        focusFirstModal,
+    } = useDirectionalNavigation();
 
-    useEffect(() => {
-        loadContentDB().then((items) =>
-            setContent(
-                items.map((item) => ({
-                    ...item,
-                    available: Math.random() > 0.5,
-                })),
-            ),
-        );
-    }, []);
+    const handleSelect = (item: ContentItem) => {
+        setSelected(item);
+        setModalOpen(true);
+    };
+
+    const handleClose = () => {
+        setSelected(null);
+        setModalOpen(false);
+    };
 
     const filtered = content.filter((item) => {
         const matchesSearch = item.name
@@ -39,22 +45,33 @@ export default function HomePage() {
     const unavailable = filtered.filter((i) => !i.available);
     const CARD_ROWS = 2;
     const availableRowCount = available.length > 0 ? CARD_ROWS : 0;
-    const unavailableBaseRow = 1 + availableRowCount; 
+    const unavailableBaseRow = 1 + availableRowCount;
+
+    useEffect(() => {
+        loadContentDB().then((items) =>
+            setContent(
+                items.map((item) => ({
+                    ...item,
+                    available: Math.random() > 0.5,
+                })),
+            ),
+        );
+    }, []);
+
+    useEffect(() => {
+        if (available.length > 0 || unavailable.length > 0) {
+            requestAnimationFrame(focusFirst);
+        }
+    }, [available.length, unavailable.length]);
+
+    useEffect(() => {
+        setEscapeHandler(handleClose);
+    }, [selected]);
 
     const toggleWishlist = (id: string) => {
         setWishlist((prev) =>
             prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id],
         );
-    };
-
-    const handleSelect = (item: ContentItem) => {
-        setSelected(item);
-        setModalOpen(true);
-    };
-
-    const handleClose = () => {
-        setSelected(null);
-        setModalOpen(false); // focus returns to lastFocusedRef automatically
     };
 
     return (
@@ -97,6 +114,8 @@ export default function HomePage() {
                     onClose={handleClose}
                     wishlist={wishlist}
                     toggleWishlist={toggleWishlist}
+                    registerModal={registerModal}
+                    focusFirstModal={focusFirstModal}
                 />
             )}
             <Menu />

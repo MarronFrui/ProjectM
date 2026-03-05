@@ -1,32 +1,33 @@
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { ContentItem } from "../../config";
-import { useDirectionalNavigation } from "../../hooks/useDirectionalNavigation";
 
 export default function PreviewModal({
-  item,
-  onClose,
-  wishlist,
-  toggleWishlist,
+    item,
+    onClose,
+    wishlist,
+    toggleWishlist,
+    registerModal,
+    focusFirstModal,
 }: {
-  item: ContentItem;
-  onClose: () => void;
-  wishlist: string[];
-  toggleWishlist: (id: string) => void;
+    item: ContentItem;
+    onClose: () => void;
+    wishlist: string[];
+    toggleWishlist: (id: string) => void;
+    registerModal: (el: HTMLElement | null) => void;
+    focusFirstModal: () => void;
 }) {
-  const navigate = useNavigate();
-  const { registerModal, setModalOpen } = useDirectionalNavigation();
 
+ const navigate = useNavigate();
 
-  useEffect(() => {
-    setModalOpen(true); 
-    return () => setModalOpen(false); // cleanup on unmount
-  }, []);
+    useEffect(() => {
+        focusFirstModal();
+    }, []);
 
   return (
     <div id="preview-modal" className="active">
       <div id="preview-content">
-        {/* Close button */}
+
         <button
           ref={registerModal}
           id="close-preview"
@@ -35,20 +36,20 @@ export default function PreviewModal({
           ✖
         </button>
 
-        {/* Poster */}
+
         <img
           id="preview-image"
           src={item.poster ?? "./content-info/poster/default.jpg"}
           alt={item.name}
         />
 
-        {/* Title */}
+
         <h3 id="preview-name">{item.name}</h3>
 
-        {/* Description */}
+
         <p id="preview-description">{item.description}</p>
 
-        {/* Duration / Seasons */}
+
         {item.seasons === null ? (
           <p id="preview-duration">Duration: {item.duration} min</p>
         ) : (
@@ -57,7 +58,7 @@ export default function PreviewModal({
           </p>
         )}
 
-        {/* Action buttons */}
+
         {item.available ? (
           <button
             ref={registerModal}

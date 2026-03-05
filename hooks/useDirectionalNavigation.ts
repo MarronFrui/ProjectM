@@ -13,14 +13,20 @@ export function useDirectionalNavigation() {
     const modalElementsRef = useRef<FocusableElement[]>([]);
     const lastFocusedRef = useRef<FocusableElement | null>(null);
     const modalOpenRef = useRef<boolean>(false);
+    const onEscape = useRef<(() => void) | null>(null);
+    const focusFirst = () => {
+        const first = Array.from(gridMap.current.values()).sort(
+            (a, b) => a.row - b.row || a.col - b.col,
+        )[0];
+        first?.el.focus();
+    };
 
-    /**
-     * Register a card or focusable element by its stable ID.
-     * Called as a ref callback: ref={(el) => register(item.id, el, row, col)}
-     * React calls this with null on unmount. we clean up automatically.
-     */
+    const focusFirstModal = () => {
+        modalElementsRef.current[0]?.focus();
+    };
+
     const register = (
-        id: string  | undefined,
+        id: string | undefined,
         el: FocusableElement | null,
         row: number,
         col: number,
@@ -39,10 +45,8 @@ export function useDirectionalNavigation() {
      */
     const registerModal = (el: FocusableElement | null) => {
         if (!el) {
-            modalElementsRef.current = modalElementsRef.current.filter(
-                (item) => item !== el,
-            );
-            return;
+        modalElementsRef.current = [];
+        return;
         }
         if (!modalElementsRef.current.includes(el)) {
             modalElementsRef.current.push(el);
@@ -52,9 +56,13 @@ export function useDirectionalNavigation() {
     const setModalOpen = (value: boolean) => {
         modalOpenRef.current = value;
         if (!value && lastFocusedRef.current) {
-            // Return focus to the card that opened the modal
+            onEscape.current = null;
             lastFocusedRef.current.focus();
         }
+    };
+
+    const setEscapeHandler = (fn: () => void) => {
+        onEscape.current = fn;
     };
 
     /**
@@ -87,7 +95,6 @@ export function useDirectionalNavigation() {
             const active = document.activeElement as HTMLElement | null;
             if (!active) return;
 
-            // ── Modal navigation ──────────────────────────────────────────────
             if (modalOpenRef.current) {
                 const list = modalElementsRef.current;
                 const index = list.indexOf(active);
@@ -110,8 +117,10 @@ export function useDirectionalNavigation() {
                         e.preventDefault();
                         return;
                     case "Escape":
+                        onEscape.current?.();
+                        e.preventDefault();
+                        return;
                     case "Back":
-                        setModalOpen(false);
                         e.preventDefault();
                         return;
                     default:
@@ -175,5 +184,12 @@ export function useDirectionalNavigation() {
         return () => window.removeEventListener("keydown", handleKeyDown);
     }, []);
 
-    return { register, registerModal, setModalOpen };
+    return {
+        register,
+        registerModal,
+        setModalOpen,
+        focusFirst,
+        setEscapeHandler,
+        focusFirstModal,
+    };
 }
