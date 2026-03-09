@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { loadContentDB, ContentItem } from "../../config";
 import { useDirectionalNavigation } from "../../hooks/useDirectionalNavigation";
@@ -7,6 +7,36 @@ export default function CategoryPage() {
     const [genres, setGenres] = useState<string[]>([]);
     const navigate = useNavigate();
     const { register, focusFirst } = useDirectionalNavigation();
+    const cardRefs = useRef<(HTMLElement | null)[]>([]);
+    const recalcGrid = () => {
+        const refs = cardRefs.current.filter(Boolean) as HTMLElement[];
+        if (!refs.length) return;
+
+        // group elements by their Y position
+        const yGroups: Map<number, HTMLElement[]> = new Map();
+        refs.forEach((el) => {
+            const y = Math.round(el.getBoundingClientRect().top);
+            if (!yGroups.has(y)) yGroups.set(y, []);
+            yGroups.get(y)!.push(el);
+        });
+
+        // sort rows by Y, assign row numbers starting at 1
+        const sortedRows = Array.from(yGroups.entries()).sort(
+            (a, b) => a[0] - b[0],
+        );
+        sortedRows.forEach(([, els], rowIndex) => {
+            // sort elements in each row by X position
+            els.sort(
+                (a, b) =>
+                    a.getBoundingClientRect().left -
+                    b.getBoundingClientRect().left,
+            );
+            els.forEach((el, colIndex) => {
+                const genre = el.dataset.genre!;
+                register(genre, el, rowIndex + 1, colIndex); // +1 keeps row 0 for back button
+            });
+        });
+    };
 
     useEffect(() => {
         async function fetchGenres() {
@@ -26,6 +56,15 @@ export default function CategoryPage() {
         if (genres.length > 0) {
             setTimeout(focusFirst, 0);
         }
+    }, [genres]);
+
+    useEffect(() => {
+        if (genres.length > 0) recalcGrid();
+    }, [genres]);
+
+    useEffect(() => {
+        window.addEventListener("resize", recalcGrid);
+        return () => window.removeEventListener("resize", recalcGrid);
     }, [genres]);
 
     const openGenre = (genre: string) => {
@@ -54,7 +93,10 @@ export default function CategoryPage() {
                             key={genre}
                             className="smaller-card"
                             tabIndex={0}
-                            ref={(el) => register(undefined, el, 1, index)}
+                            data-genre={genre}
+                            ref={(el) => {
+                                cardRefs.current[index] = el;
+                            }}
                             onClick={() => openGenre(genre)}
                         >
                             {genre}
