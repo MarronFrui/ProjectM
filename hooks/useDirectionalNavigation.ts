@@ -17,12 +17,15 @@ export function useDirectionalNavigation() {
     const focusFirst = () => {
         const first = Array.from(gridMap.current.values()).sort(
             (a, b) => a.row - b.row || a.col - b.col,
-        )[0];
+        )[1]; // [0] is always the search bar (row 0), skip it
         first?.el.focus();
     };
 
     const focusFirstModal = () => {
         modalElementsRef.current[0]?.focus();
+    };
+    const setLastFocused = (el: HTMLElement | null) => {
+        lastFocusedRef.current = el;
     };
 
     const register = (
@@ -45,8 +48,8 @@ export function useDirectionalNavigation() {
      */
     const registerModal = (el: FocusableElement | null) => {
         if (!el) {
-        modalElementsRef.current = [];
-        return;
+            modalElementsRef.current = [];
+            return;
         }
         if (!modalElementsRef.current.includes(el)) {
             modalElementsRef.current.push(el);
@@ -93,6 +96,8 @@ export function useDirectionalNavigation() {
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
             const active = document.activeElement as HTMLElement | null;
+
+            const searchEl = document.getElementById("search");
             if (!active) return;
 
             if (modalOpenRef.current) {
@@ -132,7 +137,7 @@ export function useDirectionalNavigation() {
                 return;
             }
 
-            // ── Grid navigation ───────────────────────────────────────────────
+            // Grid navigation
             const entries = Array.from(gridMap.current.values());
             const current = entries.find((entry) => entry.el === active);
             if (!current) return;
@@ -178,6 +183,14 @@ export function useDirectionalNavigation() {
                 lastFocusedRef.current = next;
                 next.focus();
             }
+
+            if (active === searchEl) {
+                if (e.key === "ArrowDown") {
+                    searchEl.blur();
+                    findClosest(1, 0)?.focus();
+                    e.preventDefault();
+                }
+            }
         };
 
         window.addEventListener("keydown", handleKeyDown);
@@ -191,5 +204,6 @@ export function useDirectionalNavigation() {
         focusFirst,
         setEscapeHandler,
         focusFirstModal,
+        setLastFocused 
     };
 }

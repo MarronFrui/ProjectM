@@ -12,6 +12,7 @@ export default function HomePage() {
     const [selected, setSelected] = useState<ContentItem | null>(null);
     const [wishlist, setWishlist] = useState<string[]>([]);
     const { genre } = useParams();
+    
     const {
         register,
         setModalOpen,
@@ -19,9 +20,11 @@ export default function HomePage() {
         setEscapeHandler,
         registerModal,
         focusFirstModal,
+        setLastFocused
     } = useDirectionalNavigation();
 
     const handleSelect = (item: ContentItem) => {
+        setLastFocused(document.activeElement as HTMLElement);
         setSelected(item);
         setModalOpen(true);
     };
@@ -85,6 +88,7 @@ export default function HomePage() {
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
                     placeholder="Search..."
+                    ref={(el) => register("search", el, 0, 0)}
                 />
             </div>
 
@@ -118,7 +122,7 @@ export default function HomePage() {
                     focusFirstModal={focusFirstModal}
                 />
             )}
-            <Menu />
+            <Menu register={register} />
         </>
     );
 }
