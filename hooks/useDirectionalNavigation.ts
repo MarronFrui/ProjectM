@@ -36,7 +36,9 @@ export function useDirectionalNavigation() {
     ) => {
         const key = id ?? `${row}-${col}`;
         if (!el) {
-            gridMap.current.delete(key);
+            const existing = gridMap.current.get(key);
+            if (existing)
+                gridMap.current.set(key, { ...existing, el: null as any });
             return;
         }
         gridMap.current.set(key, { el, row, col });
@@ -96,17 +98,25 @@ export function useDirectionalNavigation() {
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
             const active = document.activeElement as HTMLElement | null;
-
-            const searchEl = document.getElementById("search");
             if (!active) return;
 
+            // ── Search bar ────────────────────────────────────────────────────
+            const searchEl = document.getElementById("search");
+            if (active === searchEl) {
+                if (e.key === "ArrowDown") {
+                    searchEl.blur();
+                    findClosest(1, 0)?.focus();
+                    e.preventDefault();
+                }
+                return;
+            }
+
+            // ── Modal navigation ──────────────────────────────────────────────
             if (modalOpenRef.current) {
                 const list = modalElementsRef.current;
                 const index = list.indexOf(active);
                 if (index === -1) return;
-
                 let nextIndex = index;
-
                 switch (e.key) {
                     case "ArrowRight":
                     case "ArrowDown":
@@ -131,13 +141,12 @@ export function useDirectionalNavigation() {
                     default:
                         return;
                 }
-
                 e.preventDefault();
                 list[nextIndex]?.focus();
                 return;
             }
 
-            // Grid navigation
+            // ── Grid navigation ───────────────────────────────────────────────
             const entries = Array.from(gridMap.current.values());
             const current = entries.find((entry) => entry.el === active);
             if (!current) return;
@@ -152,7 +161,6 @@ export function useDirectionalNavigation() {
                     next = findClosest(current.row + 1, current.col);
                     break;
                 case "ArrowLeft":
-                    // Try exact col-1, fall back to col 0 of same row
                     next =
                         entries.find(
                             (e) =>
@@ -178,18 +186,11 @@ export function useDirectionalNavigation() {
                     return;
             }
 
-            if (next) {
+            // check next is mounted before focusing
+            if (next && document.contains(next)) {
                 e.preventDefault();
                 lastFocusedRef.current = next;
                 next.focus();
-            }
-
-            if (active === searchEl) {
-                if (e.key === "ArrowDown") {
-                    searchEl.blur();
-                    findClosest(1, 0)?.focus();
-                    e.preventDefault();
-                }
             }
         };
 
@@ -204,6 +205,6 @@ export function useDirectionalNavigation() {
         focusFirst,
         setEscapeHandler,
         focusFirstModal,
-        setLastFocused 
+        setLastFocused,
     };
 }

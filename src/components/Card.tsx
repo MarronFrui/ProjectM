@@ -6,12 +6,13 @@ interface Props {
     onSelect: () => void;
     wishlist: string[];
     toggleWishlist: (id: string) => void;
+    onFocus?: () => void;
 }
 
 const Card = forwardRef<HTMLDivElement, Props>(
-    ({ item, onSelect, wishlist, toggleWishlist }, ref) => {
+    ({ item, onSelect, wishlist, toggleWishlist, onFocus }, ref) => {
         return (
-            <div className="card" tabIndex={0} onClick={onSelect} ref={ref}>
+            <div className="card" tabIndex={0} onClick={onSelect} onFocus={onFocus} ref={ref}>
                 <img src={item.poster} alt={item.name} />
                 <h3>{item.name}</h3>
                 <p>
