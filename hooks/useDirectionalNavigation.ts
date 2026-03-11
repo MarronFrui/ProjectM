@@ -8,7 +8,12 @@ type GridEntry = {
     col: number;
 };
 
-export function useDirectionalNavigation() {
+interface NavigationOptions {
+    onVerticalNav?: (targetRow: number, col: number) => void;
+}
+
+export function useDirectionalNavigation(options: NavigationOptions = {}) {
+    const onVerticalNavRef = useRef(options.onVerticalNav);
     const gridMap = useRef<Map<string, GridEntry>>(new Map());
     const modalElementsRef = useRef<FocusableElement[]>([]);
     const lastFocusedRef = useRef<FocusableElement | null>(null);
@@ -78,13 +83,14 @@ export function useDirectionalNavigation() {
         targetRow: number,
         targetCol: number,
     ): FocusableElement | null => {
-        const entries = Array.from(gridMap.current.values());
+        const entries = Array.from(gridMap.current.values()).filter(
+            (e) => e.el && document.contains(e.el),
+        );
 
         const exact = entries.find(
             (e) => e.row === targetRow && e.col === targetCol,
         );
         if (exact) return exact.el;
-
         const sameRow = entries.filter((e) => e.row === targetRow);
         if (!sameRow.length) return null;
 
@@ -94,6 +100,10 @@ export function useDirectionalNavigation() {
             return entryDist < closestDist ? entry : closest;
         }).el;
     };
+
+    useEffect(() => {
+        onVerticalNavRef.current = options.onVerticalNav;
+    }, [options.onVerticalNav]);
 
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
@@ -147,7 +157,9 @@ export function useDirectionalNavigation() {
             }
 
             // ── Grid navigation ───────────────────────────────────────────────
-            const entries = Array.from(gridMap.current.values());
+            const entries = Array.from(gridMap.current.values()).filter(
+                (e) => e.el && document.contains(e.el),
+            );
             const current = entries.find((entry) => entry.el === active);
             if (!current) return;
 
@@ -156,9 +168,11 @@ export function useDirectionalNavigation() {
             switch (e.key) {
                 case "ArrowUp":
                     next = findClosest(current.row - 1, current.col);
+                    onVerticalNavRef.current?.(current.row - 1, current.col);
                     break;
                 case "ArrowDown":
                     next = findClosest(current.row + 1, current.col);
+                    onVerticalNavRef.current?.(current.row + 1, current.col);
                     break;
                 case "ArrowLeft":
                     next =
