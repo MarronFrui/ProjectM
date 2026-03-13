@@ -49,10 +49,6 @@ export function useDirectionalNavigation(options: NavigationOptions = {}) {
         gridMap.current.set(key, { el, row, col });
     };
 
-    /**
-     * Register elements inside a modal (cycled through with arrow keys).
-     * Call with null to deregister on unmount.
-     */
     const registerModal = (el: FocusableElement | null) => {
         if (!el) {
             modalElementsRef.current = [];
@@ -75,13 +71,10 @@ export function useDirectionalNavigation(options: NavigationOptions = {}) {
         onEscape.current = fn;
     };
 
-    /**
-     * Find the element at [targetRow, targetCol].
-     * Falls back to the nearest column in the same row if exact match missing.
-     */
     const findClosest = (
         targetRow: number,
         targetCol: number,
+        sourceEl?: FocusableElement, // ← the element we're navigating FROM
     ): FocusableElement | null => {
         const entries = Array.from(gridMap.current.values()).filter(
             (e) => e.el && document.contains(e.el),
@@ -91,8 +84,20 @@ export function useDirectionalNavigation(options: NavigationOptions = {}) {
             (e) => e.row === targetRow && e.col === targetCol,
         );
         if (exact) return exact.el;
+
         const sameRow = entries.filter((e) => e.row === targetRow);
         if (!sameRow.length) return null;
+
+        if (sourceEl) {
+            const sourceX = sourceEl.getBoundingClientRect().left;
+            return sameRow.reduce((closest, entry) => {
+                const closestX = closest.el.getBoundingClientRect().left;
+                const entryX = entry.el.getBoundingClientRect().left;
+                return Math.abs(entryX - sourceX) < Math.abs(closestX - sourceX)
+                    ? entry
+                    : closest;
+            }).el;
+        }
 
         return sameRow.reduce((closest, entry) => {
             const closestDist = Math.abs(closest.col - targetCol);
@@ -167,12 +172,10 @@ export function useDirectionalNavigation(options: NavigationOptions = {}) {
 
             switch (e.key) {
                 case "ArrowUp":
-                    next = findClosest(current.row - 1, current.col);
-                    onVerticalNavRef.current?.(current.row - 1, current.col);
+                    next = findClosest(current.row - 1, current.col, active);
                     break;
                 case "ArrowDown":
-                    next = findClosest(current.row + 1, current.col);
-                    onVerticalNavRef.current?.(current.row + 1, current.col);
+                    next = findClosest(current.row + 1, current.col, active);
                     break;
                 case "ArrowLeft":
                     next =

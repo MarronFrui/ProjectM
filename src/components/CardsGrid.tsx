@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, forwardRef, useImperativeHandle } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { ContentItem } from "../../config";
 import Card from "./Card";
 
@@ -7,9 +7,6 @@ const COLS_BUFFER = 2;
 const COLS_TOTAL = COLS_VISIBLE + COLS_BUFFER * 2;
 const TRIGGER = 3;
 
-export interface CardsGridHandle {
-    ensureColVisible: (col: number) => void;
-}
 
 interface Props {
     items: ContentItem[];
@@ -20,14 +17,14 @@ interface Props {
     baseRow: number;
 }
 
-const CardsGrid = forwardRef<CardsGridHandle, Props>(({
+export default function CardsGrid({
     items,
     onSelect,
     wishlist,
     toggleWishlist,
     register,
     baseRow,
-}, ref) => {
+}: Props) {
     const CARD_ROWS = 2;
     const totalCols = Math.ceil(items.length / CARD_ROWS);
 
@@ -39,18 +36,6 @@ const CardsGrid = forwardRef<CardsGridHandle, Props>(({
         }
     }, [items.length]);
 
-    const ensureColVisible = useCallback((col: number) => {
-        setRange((prev) => {
-            if (col >= prev.start && col < prev.end) return prev;
-            const half = Math.floor(COLS_TOTAL / 2);
-            const start = Math.max(0, col - half);
-            const end = Math.min(totalCols, start + COLS_TOTAL);
-            return { start, end };
-        });
-    }, [totalCols]);
-
-    // expose ensureColVisible to parent
-    useImperativeHandle(ref, () => ({ ensureColVisible }), [ensureColVisible]);
 
     const onCardFocus = useCallback((col: number) => {
         setRange((prev) => {
@@ -90,7 +75,5 @@ const CardsGrid = forwardRef<CardsGridHandle, Props>(({
             })}
         </div>
     );
-});
+}
 
-CardsGrid.displayName = "CardsGrid";
-export default CardsGrid;

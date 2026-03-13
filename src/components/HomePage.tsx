@@ -1,7 +1,7 @@
 import { useParams } from "react-router-dom";
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState } from "react";
 import { loadContentDB, ContentItem } from "../../config";
-import CardsGrid, { CardsGridHandle } from "./CardsGrid";
+import CardsGrid from "./CardsGrid";
 import PreviewModal from "./PreviewModal";
 import Menu from "../components/Menu";
 import { useDirectionalNavigation } from "../../hooks/useDirectionalNavigation";
@@ -12,8 +12,6 @@ export default function HomePage() {
     const [selected, setSelected] = useState<ContentItem | null>(null);
     const [wishlist, setWishlist] = useState<string[]>([]);
     const { genre } = useParams();
-    const availableGridRef = useRef<CardsGridHandle>(null);
-    const unavailableGridRef = useRef<CardsGridHandle>(null);
 
     const {
         register,
@@ -23,15 +21,7 @@ export default function HomePage() {
         registerModal,
         focusFirstModal,
         setLastFocused,
-    } = useDirectionalNavigation({
-        onVerticalNav: (targetRow, col) => {
-            if (targetRow >= 1 && targetRow <= 2) {
-                availableGridRef.current?.ensureColVisible(col);
-            } else if (targetRow >= 3 && targetRow <= 4) {
-                unavailableGridRef.current?.ensureColVisible(col);
-            }
-        },
-    });
+    } = useDirectionalNavigation()
     const handleSelect = (item: ContentItem) => {
         setLastFocused(document.activeElement as HTMLElement);
         setSelected(item);
@@ -103,7 +93,6 @@ export default function HomePage() {
 
             <h2>Available</h2>
             <CardsGrid
-                ref={availableGridRef}
                 items={available}
                 onSelect={handleSelect}
                 wishlist={wishlist}
@@ -114,7 +103,6 @@ export default function HomePage() {
 
             <h2>Unavailable</h2>
             <CardsGrid
-                ref={unavailableGridRef}
                 items={unavailable}
                 onSelect={handleSelect}
                 wishlist={wishlist}
