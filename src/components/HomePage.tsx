@@ -84,24 +84,23 @@ export default function HomePage() {
                 <h1>Homemade Netflix</h1>
             </header>
             <nav>
-
-            <button
-                className="login-btn"
-                ref={(el) => register("login-btn", el, 0, 1)}
-                onClick={() => navigate("/login")}
+                <button
+                    className="login-btn"
+                    ref={(el) => register("login-btn", el, 0, 1)}
+                    onClick={() => navigate("/login")}
                 >
-                Login
-            </button>
-            <div className="search-container">
-                <input
-                    id="search"
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    placeholder="Search..."
-                    ref={(el) => register("search", el, 0, 0)}
+                    Login
+                </button>
+                <div className="search-container">
+                    <input
+                        id="search"
+                        value={search}
+                        onChange={(e) => setSearch(e.target.value)}
+                        placeholder="Search..."
+                        ref={(el) => register("search", el, 0, 0)}
                     />
-            </div>
-                    </nav>
+                </div>
+            </nav>
 
             <h2>Available</h2>
             <CardsGrid

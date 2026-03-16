@@ -19,10 +19,11 @@ export function useDirectionalNavigation(options: NavigationOptions = {}) {
     const lastFocusedRef = useRef<FocusableElement | null>(null);
     const modalOpenRef = useRef<boolean>(false);
     const onEscape = useRef<(() => void) | null>(null);
+
     const focusFirst = () => {
         const first = Array.from(gridMap.current.values()).sort(
             (a, b) => a.row - b.row || a.col - b.col,
-        )[1]; // [0] is always the search bar (row 0), skip it
+        )[2]; // [0] is always the search bar (row 0), skip it
         first?.el.focus();
     };
 

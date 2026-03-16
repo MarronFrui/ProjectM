@@ -2,16 +2,14 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { loadContentDB, ContentItem } from "../../config";
 import CardsGrid from "./CardsGrid";
+import { useDirectionalNavigation } from "../../hooks/useDirectionalNavigation";
 
 export default function WishlistPage() {
     const navigate = useNavigate();
+    const { register, focusFirst } = useDirectionalNavigation();
 
     const [content, setContent] = useState<ContentItem[]>([]);
     const [wishlist, setWishlist] = useState<string[]>([]);
-
-    useEffect(() => {
-        loadContentDB().then(setContent);
-    }, []);
 
     const toggleWishlist = (id: string) => {
         setWishlist((prev) =>
@@ -20,6 +18,15 @@ export default function WishlistPage() {
     };
 
     const wishlistItems = content.filter((item) => wishlist.includes(item.id));
+
+    useEffect(() => {
+        loadContentDB().then(setContent);
+    }, []);
+    
+    // wishlistItems.length will trigger focusFirst once wishlist persistence is implemented
+    useEffect(() => {
+        if (wishlistItems.length > 0) requestAnimationFrame(focusFirst);
+    }, [wishlistItems.length]);
 
     return (
         <>
@@ -36,6 +43,8 @@ export default function WishlistPage() {
                     onSelect={() => {}}
                     wishlist={wishlist}
                     toggleWishlist={toggleWishlist}
+                    register={register}
+                    baseRow={1}
                 />
             ) : (
                 <p>Your wishlist is empty.</p>
