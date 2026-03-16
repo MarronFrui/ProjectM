@@ -1,4 +1,4 @@
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { loadContentDB, ContentItem } from "../../config";
 import CardsGrid from "./CardsGrid";
@@ -21,7 +21,7 @@ export default function HomePage() {
         registerModal,
         focusFirstModal,
         setLastFocused,
-    } = useDirectionalNavigation()
+    } = useDirectionalNavigation();
     const handleSelect = (item: ContentItem) => {
         setLastFocused(document.activeElement as HTMLElement);
         setSelected(item);
@@ -32,6 +32,8 @@ export default function HomePage() {
         setSelected(null);
         setModalOpen(false);
     };
+
+    const navigate = useNavigate();
 
     const filtered = content.filter((item) => {
         const matchesSearch = item.name
@@ -81,6 +83,15 @@ export default function HomePage() {
             <header>
                 <h1>Homemade Netflix</h1>
             </header>
+            <nav>
+
+            <button
+                className="login-btn"
+                ref={(el) => register("login-btn", el, 0, 1)}
+                onClick={() => navigate("/login")}
+                >
+                Login
+            </button>
             <div className="search-container">
                 <input
                     id="search"
@@ -88,8 +99,9 @@ export default function HomePage() {
                     onChange={(e) => setSearch(e.target.value)}
                     placeholder="Search..."
                     ref={(el) => register("search", el, 0, 0)}
-                />
+                    />
             </div>
+                    </nav>
 
             <h2>Available</h2>
             <CardsGrid

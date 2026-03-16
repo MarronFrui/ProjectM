@@ -3,6 +3,7 @@ import HomePage from "./HomePage";
 import CategoryPage from "./CategoryPage";
 import WishlistPage from "./WishlistPage";
 import PlayerPage from "./PlayerPage";
+import LoginPage from "./LoginPage";
 
 export default function App() {
     return (
@@ -13,6 +14,7 @@ export default function App() {
                 <Route path="/category/:genre" element={<HomePage />} />
                 <Route path="/wishlist" element={<WishlistPage />} />
                 <Route path="/player/:id" element={<PlayerPage />} />
+                <Route path="/login" element={<LoginPage />} />
             </Routes>
         </BrowserRouter>
     );
