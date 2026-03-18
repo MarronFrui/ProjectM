@@ -21,10 +21,12 @@ export function useDirectionalNavigation(options: NavigationOptions = {}) {
     const onEscape = useRef<(() => void) | null>(null);
 
     const focusFirst = () => {
-        const first = Array.from(gridMap.current.values()).sort(
-            (a, b) => a.row - b.row || a.col - b.col,
-        )[2]; // [0] is always the search bar (row 0), skip it
-        first?.el.focus();
+        const sorted = Array.from(gridMap.current.values())
+            .filter((e) => e.el && document.contains(e.el))
+            .sort((a, b) => a.row - b.row || a.col - b.col);
+
+        const firstCard = sorted.find((e) => e.row > 0);
+        firstCard?.el.focus();
     };
 
     const focusFirstModal = () => {
@@ -167,6 +169,13 @@ export function useDirectionalNavigation(options: NavigationOptions = {}) {
                 (e) => e.el && document.contains(e.el),
             );
             const current = entries.find((entry) => entry.el === active);
+            if (
+                ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(
+                    e.key,
+                )
+            ) {
+                e.preventDefault();
+            }
             if (!current) return;
 
             let next: FocusableElement | null = null;

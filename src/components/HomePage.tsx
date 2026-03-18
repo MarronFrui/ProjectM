@@ -1,5 +1,5 @@
 import { useParams, useNavigate } from "react-router-dom";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { loadContentDB, ContentItem } from "../../config";
 import CardsGrid from "./CardsGrid";
 import PreviewModal from "./PreviewModal";
@@ -62,8 +62,14 @@ export default function HomePage() {
         );
     }, []);
 
+    const hasInitialized = useRef(false);
+
     useEffect(() => {
-        if (available.length > 0 || unavailable.length > 0) {
+        if (
+            !hasInitialized.current &&
+            (available.length > 0 || unavailable.length > 0)
+        ) {
+            hasInitialized.current = true;
             requestAnimationFrame(focusFirst);
         }
     }, [available.length, unavailable.length]);
@@ -105,6 +111,7 @@ export default function HomePage() {
             <h2>Available</h2>
             <CardsGrid
                 items={available}
+                searchActive={search.length > 0}
                 onSelect={handleSelect}
                 wishlist={wishlist}
                 toggleWishlist={toggleWishlist}
@@ -115,6 +122,7 @@ export default function HomePage() {
             <h2>Unavailable</h2>
             <CardsGrid
                 items={unavailable}
+                searchActive={search.length > 0}
                 onSelect={handleSelect}
                 wishlist={wishlist}
                 toggleWishlist={toggleWishlist}

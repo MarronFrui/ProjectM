@@ -7,14 +7,19 @@ const COLS_BUFFER = 2;
 const COLS_TOTAL = COLS_VISIBLE + COLS_BUFFER * 2;
 const TRIGGER = 3;
 
-
 interface Props {
     items: ContentItem[];
     onSelect: (item: ContentItem) => void;
     wishlist: string[];
     toggleWishlist: (id: string) => void;
-    register: (id: string | undefined, el: HTMLElement | null, row: number, col: number) => void;
+    register: (
+        id: string | undefined,
+        el: HTMLElement | null,
+        row: number,
+        col: number,
+    ) => void;
     baseRow: number;
+    searchActive?: boolean;
 }
 
 export default function CardsGrid({
@@ -24,10 +29,10 @@ export default function CardsGrid({
     toggleWishlist,
     register,
     baseRow,
+    searchActive,
 }: Props) {
     const CARD_ROWS = 2;
     const totalCols = Math.ceil(items.length / CARD_ROWS);
-
     const [range, setRange] = useState({ start: 0, end: 0 });
 
     useEffect(() => {
@@ -36,24 +41,28 @@ export default function CardsGrid({
         }
     }, [items.length]);
 
+    const onCardFocus = useCallback(
+        (col: number) => {
+            setRange((prev) => {
+                let { start, end } = prev;
+                if (col >= end - TRIGGER && end < totalCols) {
+                    end = Math.min(end + COLS_BUFFER, totalCols);
+                    if (end - start > COLS_TOTAL) start = end - COLS_TOTAL;
+                }
+                if (col <= start + TRIGGER && start > 0) {
+                    start = Math.max(start - COLS_BUFFER, 0);
+                    if (end - start > COLS_TOTAL) end = start + COLS_TOTAL;
+                }
+                if (start === prev.start && end === prev.end) return prev;
+                return { start, end };
+            });
+        },
+        [totalCols],
+    );
 
-    const onCardFocus = useCallback((col: number) => {
-        setRange((prev) => {
-            let { start, end } = prev;
-            if (col >= end - TRIGGER && end < totalCols) {
-                end = Math.min(end + COLS_BUFFER, totalCols);
-                if (end - start > COLS_TOTAL) start = end - COLS_TOTAL;
-            }
-            if (col <= start + TRIGGER && start > 0) {
-                start = Math.max(start - COLS_BUFFER, 0);
-                if (end - start > COLS_TOTAL) end = start + COLS_TOTAL;
-            }
-            if (start === prev.start && end === prev.end) return prev;
-            return { start, end };
-        });
-    }, [totalCols]);
-
-    const visibleItems = items.slice(range.start * CARD_ROWS, range.end * CARD_ROWS);
+    const visibleItems = searchActive
+        ? items
+        : items.slice(range.start * CARD_ROWS, range.end * CARD_ROWS);
 
     return (
         <div className="card-container">
@@ -76,4 +85,3 @@ export default function CardsGrid({
         </div>
     );
 }
-
