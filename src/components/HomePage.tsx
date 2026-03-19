@@ -92,7 +92,7 @@ export default function HomePage() {
             <nav>
                 <button
                     className="login-btn"
-                    ref={(el) => register("login-btn", el, 0, 1)}
+                    ref={(el) => register("login-btn", el, 0, 0)}
                     onClick={() => navigate("/login")}
                 >
                     Login
@@ -103,7 +103,7 @@ export default function HomePage() {
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
                         placeholder="Search..."
-                        ref={(el) => register("search", el, 0, 0)}
+                        ref={(el) => register("search", el, 0, 1)}
                     />
                 </div>
             </nav>
