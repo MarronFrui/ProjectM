@@ -1,3 +1,10 @@
+:root {
+    --plyr-color-main: #e50914;
+    --plyr-video-background: #1e1e1e;
+    --plyr-menu-background: #222;
+    --plyr-menu-color: #e0e0e0;
+}
+
 body {
     background-color: #1e1e1e;
     color: aliceblue;
