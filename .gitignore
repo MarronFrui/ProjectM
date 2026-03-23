@@ -3,3 +3,4 @@ apikeyOMDb.json
 skipped.txt
 dist
 content-info
+.env
