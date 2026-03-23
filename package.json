@@ -28,6 +28,7 @@
     "tsx": "^4.20.6"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.99.3",
     "jsdom": "^27.0.1",
     "plyr": "^3.8.4",
     "react": "^19.2.4",

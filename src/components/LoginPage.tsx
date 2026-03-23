@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { supabase } from './src/components/supabase.ts'
  
 export default function LoginPage() {
     const [username, setUsername] = useState("");
@@ -9,34 +10,36 @@ export default function LoginPage() {
     const navigate = useNavigate();
  
     const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-        setError("");
-        setLoading(true);
- 
-        // placeholder auth
-        await new Promise((res) => setTimeout(res, 800));
- 
-        if (username === "admin" && password === "admin") {
-            navigate("/");
-        } else {
-            setError("Invalid username or password.");
-        }
- 
-        setLoading(false);
-    };
+    e.preventDefault();
+    setError("");
+    setLoading(true);
+
+    const { error } = await supabase.auth.signInWithPassword({
+        email: username,
+        password: password,
+    });
+
+    if (error) {
+        setError(error.message);
+    } else {
+        navigate("/");
+    }
+
+    setLoading(false);
+};
  
     return (
         <div className="login-page">
             <div className="login-noise" />
  
             <div className="login-wrapper">
-                {/* Logo */}
+
                 <div className="login-logo">
                     <h1 className="login-logo-title">HOMEMADE</h1>
                     <p className="login-logo-subtitle">Private Media</p>
                 </div>
  
-                {/* Card */}
+
                 <div className="login-card">
                     <h2 className="login-heading">Sign in</h2>
  
