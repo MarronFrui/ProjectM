@@ -1,48 +1,45 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { supabase } from '../../supabase'
- 
+import supabase from '../supabase';
+
 export default function LoginPage() {
     const [username, setUsername] = useState("");
     const [password, setPassword] = useState("");
     const [error, setError] = useState("");
     const [loading, setLoading] = useState(false);
     const navigate = useNavigate();
- 
+
     const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError("");
-    setLoading(true);
+        e.preventDefault();
+        setError("");
+        setLoading(true);
 
-    const { error } = await supabase.auth.signInWithPassword({
-        email: username,
-        password: password,
-    });
+        const { data, error } = await supabase.auth.signInWithPassword({
+            email: username,
+            password: password,
+        });
 
-    if (error) {
-        setError(error.message);
-    } else {
-        navigate("/");
-    }
+        if (error) {
+            setError(error.message);
+            console.error("Login error:", error.message);
+        } else if (data.session) {
+            console.log("Logged in:", data);
+            navigate("/");
+        }
 
-    setLoading(false);
-};
- 
+        setLoading(false);
+    };
+
     return (
         <div className="login-page">
             <div className="login-noise" />
- 
             <div className="login-wrapper">
-
                 <div className="login-logo">
                     <h1 className="login-logo-title">HOMEMADE</h1>
                     <p className="login-logo-subtitle">Private Media</p>
                 </div>
- 
-
                 <div className="login-card">
                     <h2 className="login-heading">Sign in</h2>
- 
                     <form onSubmit={handleSubmit} className="login-form">
                         <div className="login-field">
                             <label className="login-label">Username</label>
@@ -55,7 +52,6 @@ export default function LoginPage() {
                                 className="login-input"
                             />
                         </div>
- 
                         <div className="login-field">
                             <label className="login-label">Password</label>
                             <input
@@ -67,9 +63,7 @@ export default function LoginPage() {
                                 className="login-input"
                             />
                         </div>
- 
                         {error && <p className="login-error">{error}</p>}
- 
                         <button
                             type="submit"
                             disabled={loading}
@@ -79,8 +73,7 @@ export default function LoginPage() {
                         </button>
                     </form>
                 </div>
- 
-                <p className="login-footer">Si tu lis ça nique ta mère</p>
+                <p className="login-footer">yeet</p>
             </div>
         </div>
     );

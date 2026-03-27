@@ -5,6 +5,7 @@ import WishlistPage from "./WishlistPage";
 import PlayerPage from "./PlayerPage";
 import LoginPage from "./LoginPage";
 
+
 export default function App() {
     return (
         <BrowserRouter>
