@@ -5,6 +5,7 @@ import CardsGrid from "./CardsGrid";
 import PreviewModal from "./PreviewModal";
 import Menu from "../components/Menu";
 import { useDirectionalNavigation } from "../../hooks/useDirectionalNavigation";
+import { useAuth } from "./AuthProvider";
 
 export default function HomePage() {
     const [content, setContent] = useState<ContentItem[]>([]);
@@ -33,6 +34,7 @@ export default function HomePage() {
         setModalOpen(false);
     };
 
+    const { user, signOut } = useAuth();
     const navigate = useNavigate();
 
     const filtered = content.filter((item) => {
@@ -90,13 +92,25 @@ export default function HomePage() {
                 <h1>Homemade Netflix</h1>
             </header>
             <nav>
-                <button
-                    className="login-btn"
-                    ref={(el) => register("login-btn", el, 0, 0)}
-                    onClick={() => navigate("/login")}
-                >
-                    Login
-                </button>
+                {user ? (
+                    <>
+                        <button
+                            className="login-btn"
+                            ref={(el) => register("login-btn", el, 0, 0)}
+                            onClick={signOut}
+                        >
+                            Logout
+                        </button>
+                    </>
+                ) : (
+                    <button
+                        className="login-btn"
+                        onClick={() => navigate("/login")}
+                        ref={(el) => register("login-btn", el, 0, 0)}
+                    >
+                        Login
+                    </button>
+                )}
                 <div className="search-container">
                     <input
                         id="search"

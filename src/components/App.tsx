@@ -4,10 +4,12 @@ import CategoryPage from "./CategoryPage";
 import WishlistPage from "./WishlistPage";
 import PlayerPage from "./PlayerPage";
 import LoginPage from "./LoginPage";
-
+import { AuthProvider } from "./AuthProvider";
 
 export default function App() {
     return (
+        <AuthProvider> 
+
         <BrowserRouter>
             <Routes>
                 <Route path="/" element={<HomePage />} />
@@ -18,5 +20,6 @@ export default function App() {
                 <Route path="/login" element={<LoginPage />} />
             </Routes>
         </BrowserRouter>
+        </AuthProvider>
     );
 }

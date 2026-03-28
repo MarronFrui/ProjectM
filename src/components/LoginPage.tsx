@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import supabase from '../supabase';
+import { supabase } from '../supabase';
 
 export default function LoginPage() {
     const [username, setUsername] = useState("");
@@ -21,9 +21,7 @@ export default function LoginPage() {
 
         if (error) {
             setError(error.message);
-            console.error("Login error:", error.message);
         } else if (data.session) {
-            console.log("Logged in:", data);
             navigate("/");
         }
 

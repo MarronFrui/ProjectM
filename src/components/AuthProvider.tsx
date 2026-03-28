@@ -1,28 +1,61 @@
-import { useState, useEffect, createContext, useContext, ReactNode } from "react";
-import supabase from '../supabase';
+import {
+    useState,
+    useEffect,
+    createContext,
+    useContext,
+    ReactNode,
+} from "react";
+import { supabase } from "../supabase";
 
+type AuthContextType = {
+    user: any;
+    session: any;
+    loading: boolean;
+    signOut: () => Promise<void>;
+};
 
-type Todo = { id: string; title: string; completed: boolean };
-type TodosContextType = { todos: Todo[] };
+const AuthContext = createContext<AuthContextType>({
+    user: null,
+    session: null,
+    loading: true,
+    signOut: async () => {},
+});
 
-const TodosContext = createContext<TodosContextType>({ todos: [] });
-
-export function TodosProvider({ children }: { children: ReactNode }) {
-    const [todos, setTodos] = useState<Todo[]>([]);
+export function AuthProvider({ children }: { children: ReactNode }) {
+    const [user, setUser] = useState<any>(null);
+    const [session, setSession] = useState<any>(null);
+    const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        async function fetchTodos() {
-            const { data, error } = await supabase.from("todos").select();
-            if (error) {
-                console.error("Failed to fetch todos:", error);
-                return;
-            }
-            if (data) setTodos(data);
-        }
-        fetchTodos();
+        // get current session on load
+        supabase.auth.getSession().then(({ data: { session } }) => {
+            setSession(session);
+            setUser(session?.user ?? null);
+            setLoading(false);
+        });
+
+        // listen to auth changes (login/logout)
+        const { data: listener } = supabase.auth.onAuthStateChange(
+            (_event, session) => {
+                setSession(session);
+                setUser(session?.user ?? null);
+            },
+        );
+
+        return () => {
+            listener.subscription.unsubscribe();
+        };
     }, []);
 
-    return <TodosContext.Provider value={{ todos }}>{children}</TodosContext.Provider>;
+    const signOut = async () => {
+        await supabase.auth.signOut();
+    };
+
+    return (
+        <AuthContext.Provider value={{ user, session, loading, signOut }}>
+            {children}
+        </AuthContext.Provider>
+    );
 }
 
-export const useTodos = () => useContext(TodosContext);
+export const useAuth = () => useContext(AuthContext);
