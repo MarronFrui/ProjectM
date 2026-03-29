@@ -53,34 +53,11 @@ export default function HomePage() {
     const availableRowCount = available.length > 0 ? CARD_ROWS : 0;
     const unavailableBaseRow = 1 + availableRowCount;
 
-useEffect(() => {
-    loadContentDB().then((items) => {
-
-        fetch("http://192.168.5.67:3000/api/content")
-            .then((res) => res.json())
-            .then((availableItems: ContentItem[]) => {
-                const availableSet = new Set(
-                    availableItems
-                        .filter((i) => i.available)
-                        .map((i) => i.id)
-                );
-
-                // Merge: keep all items, mark only those present as available
-                setContent(
-                    items.map((item) => ({
-                        ...item,
-                        available: availableSet.has(item.id),
-                    }))
-                );
-            })
-            .catch((err) => {
-                console.error("Failed to fetch availability:", err);
-                // fallback: all items as unavailable
-                setContent(items.map((item) => ({ ...item, available: false })));
-            });
-    });
-}, []);
-
+    useEffect(() => {
+        loadContentDB().then((items) => {
+            setContent(items);
+        });
+    }, []);
 
     const hasInitialized = useRef(false);
 

@@ -1,3 +1,5 @@
+import { supabase } from "./src/supabase";
+
 export interface ContentItem {
   id: string;
   name: string;
@@ -14,7 +16,11 @@ export interface ContentItem {
 }
 
 export async function loadContentDB(): Promise<ContentItem[]> {
-  const res = await fetch("/content-info/contentDB.json");
-  if (!res.ok) throw new Error("Failed to load contentDB.json");
-  return res.json();
+    const { data, error } = await supabase.from("content").select("*");
+    if (error) throw new Error(error.message);
+    return data.map((item: any) => ({
+        ...item,
+        filePath: item.file_path,
+        releaseYear: item.release_year,
+    }));
 }

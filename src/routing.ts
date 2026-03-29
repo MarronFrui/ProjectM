@@ -1,33 +1,45 @@
-
 import { Router } from "express";
 import fs from "fs/promises";
+import { createClient } from "@supabase/supabase-js";
 
 const router = Router();
 
-const DB_PATH = "./content-info/contentDB.json";
 const MEDIA_PATH = "/mnt/media";
+
+const supabase = createClient(
+    "http://192.168.5.67:8000",
+    process.env.SERVICE_ROLE_KEY!
+);
 
 function normalize(str: string) {
     return str.toLowerCase().replace(/[^a-z0-9]/g, "");
 }
 
-router.get("/content", async (req, res) => {
+router.post("/scan", async (req, res) => {
     try {
-        const raw = await fs.readFile(DB_PATH, "utf-8");
-        const db = JSON.parse(raw);
-
         const files = await fs.readdir(MEDIA_PATH);
-        const availableSet = new Set(files.map(normalize));
+        const { data: items } = await supabase
+            .from("content")
+            .select("id, name, file_path");
 
-        const merged = db.map((item: any) => ({
-            ...item,
-            available: availableSet.has(normalize(item.name)),
-        }));
+        for (const item of items ?? []) {
+            const match = files.find((f) =>
+                normalize(f).includes(normalize(item.name))
+            );
+            if (match) {
+                await supabase
+                    .from("content")
+                    .update({
+                        available: true,
+                        file_path: `${MEDIA_PATH}/${match}`,
+                    })
+                    .eq("id", item.id);
+            }
+        }
 
-        res.json(merged);
+        res.json({ scanned: files.length });
     } catch (err) {
-        console.error(err);
-        res.status(500).json({ error: "failed" });
+        res.status(500).json({ error: "scan failed" });
     }
 });
 
