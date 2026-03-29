@@ -53,11 +53,17 @@ export default function HomePage() {
     const availableRowCount = available.length > 0 ? CARD_ROWS : 0;
     const unavailableBaseRow = 1 + availableRowCount;
 
-    useEffect(() => {
-        loadContentDB().then((items) => {
+useEffect(() => {
+    loadContentDB()
+        .then((items) => {
             setContent(items);
+        })
+        .catch((err) => {
+            console.error("Failed to load contentDB.json", err);
+            setContent([]);
         });
-    }, []);
+}, []);
+
 
     const hasInitialized = useRef(false);
 
