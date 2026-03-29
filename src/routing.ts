@@ -1,46 +1,32 @@
-import { Router } from "express";
+import express from "express";
 import fs from "fs/promises";
-import { createClient } from "@supabase/supabase-js";
+import type { ContentItem } from "../config"; // only for TS typing
 
-const router = Router();
+import contentDBRaw from "../content-info/contentDB.json" with { type: "json" };
 
+const router = express.Router();
 const MEDIA_PATH = "/mnt/media";
 
-const supabase = createClient(
-    "http://192.168.5.67:8000",
-    process.env.SERVICE_ROLE_KEY!
-);
-
 function normalize(str: string) {
-    return str.toLowerCase().replace(/[^a-z0-9]/g, "");
+  return str.toLowerCase().replace(/[^a-z0-9]/g, "");
 }
 
-router.post("/scan", async (req, res) => {
-    try {
-        const files = await fs.readdir(MEDIA_PATH);
-        const { data: items } = await supabase
-            .from("content")
-            .select("id, name, file_path");
+const contentDB: ContentItem[] = contentDBRaw;
 
-        for (const item of items ?? []) {
-            const match = files.find((f) =>
-                normalize(f).includes(normalize(item.name))
-            );
-            if (match) {
-                await supabase
-                    .from("content")
-                    .update({
-                        available: true,
-                        file_path: `${MEDIA_PATH}/${match}`,
-                    })
-                    .eq("id", item.id);
-            }
-        }
+router.get("/content-availability", async (req, res) => {
+  try {
+    const files = await fs.readdir(MEDIA_PATH);
 
-        res.json({ scanned: files.length });
-    } catch (err) {
-        res.status(500).json({ error: "scan failed" });
-    }
+    const itemsWithAvailability: ContentItem[] = contentDB.map(item => {
+      const exists = files.some(f => normalize(f).includes(normalize(item.name)));
+      return { ...item, available: exists };
+    });
+
+    res.json(itemsWithAvailability);
+  } catch (err) {
+    console.error("Availability check failed:", err);
+    res.status(500).json({ error: "Failed to check availability" });
+  }
 });
 
 export default router;

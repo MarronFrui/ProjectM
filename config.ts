@@ -14,7 +14,7 @@ export interface ContentItem {
 }
 
 export async function loadContentDB(): Promise<ContentItem[]> {
-  const res = await fetch("/content-info/contentDB.json");
-  if (!res.ok) throw new Error("Failed to load contentDB.json");
+  const res = await fetch(`${import.meta.env.VITE_API_URL}/api/content-availability`);
+  if (!res.ok) throw new Error("Failed to load content availability");
   return res.json();
 }
