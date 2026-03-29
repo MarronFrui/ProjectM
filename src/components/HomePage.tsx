@@ -56,7 +56,7 @@ export default function HomePage() {
 useEffect(() => {
     loadContentDB().then((items) => {
 
-        fetch("http://192.168.5.67:8000/api/content")
+        fetch("http://192.168.5.67:3000/api/content")
             .then((res) => res.json())
             .then((availableItems: ContentItem[]) => {
                 const availableSet = new Set(
