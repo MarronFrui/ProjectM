@@ -4,3 +4,4 @@ skipped.txt
 dist
 content-info
 .env
+.env.production
