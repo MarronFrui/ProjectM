@@ -9,7 +9,8 @@ const app = express();
 app.use(cors());
 
 const MEDIA_PATH = "/mnt/media";
-const DB_PATH = path.resolve(__dirname, "./content-info/contentDB.json");
+const DB_PATH = path.resolve(__dirname, "../content-info/contentDB.json");
+console.log("Resolved DB path:", DB_PATH);
 
 function normalize(str) {
     return str.toLowerCase().replace(/[^a-z0-9]/g, "");
