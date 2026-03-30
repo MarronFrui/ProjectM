@@ -56,6 +56,8 @@ app.get("/api/content-availability", async (req, res) => {
     }
 });
 
+
+
 app.use("/media", express.static(MEDIA_PATH));
 
 app.listen(3000, () => console.log("Express running on port 3000"));

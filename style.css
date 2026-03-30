@@ -391,12 +391,23 @@ a {
 }
 
 .videoplayer {
+    display: block;
     width: auto;
     height: 60vh; 
     max-height: 80vh; 
     aspect-ratio: 16 / 9;
     border-radius: 12px;
     box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+}
+
+.plyr__controls {
+    font-size: 1rem;
+    bottom: 0.5rem;
+}
+
+.plyr {
+    width: 100%;
+    max-width: 100%;
 }
 
 #available-cards:empty,
