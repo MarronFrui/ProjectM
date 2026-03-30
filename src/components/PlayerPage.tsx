@@ -73,7 +73,7 @@ export default function PlayerPage() {
     if (!item) return <div>Loading...</div>;
 
     console.log(item);
-    console.log("VIDEO URL:", `http://192.168.5.67:3000${item.filePath}`);
+    console.log("VIDEO URL:", `http://192.168.5.67:3000/media/${item.id}`);
 
     return (
         <>
@@ -87,7 +87,7 @@ export default function PlayerPage() {
             </button>
             <h2>{item.name}</h2>
 
-            {item.filePath ? (
+            {item.available ? (
                 <div className="videoplayer-container">
                     <video ref={videoRef} className="videoplayer" autoPlay>
                         <source

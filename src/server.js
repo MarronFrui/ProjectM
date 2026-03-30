@@ -56,7 +56,57 @@ app.get("/api/content-availability", async (req, res) => {
     }
 });
 
+async function loadContentWithPaths() {
+    const raw = await fs.readFile(DB_PATH, "utf-8");
+    const contentDB = JSON.parse(raw);
 
+    const files = await fs.readdir(MEDIA_PATH);
+
+    const updatedDb = contentDB.map((item) => {
+        const match = files.find((f) => matches(f, item.name));
+        return {
+            ...item,
+            filePath: match ? `/media/${match}` : null,
+        };
+    });
+
+    return updatedDb;
+}
+
+app.get("/media/:id", async (req, res) => {
+    try {
+        const copyDB = await loadContentWithPaths(); 
+        const item = copyDB.find(i => i.id === req.params.id);
+
+        if (!item || !item.filePath)
+            return res.status(404).send("File not found");
+
+        // The folder where the media is stored
+        const folderName = path.basename(item.filePath);
+        const folderPath = path.join(MEDIA_PATH, folderName);
+
+        // Read all files in the folder
+        const files = await fs.readdir(folderPath);
+
+        const videoFile = files.find(f =>
+            /\.(mp4|mkv|avi|mov|webm)$/i.test(f)
+        );
+
+        if (!videoFile) return res.status(404).send("No video file found");
+
+        const fullPath = path.join(folderPath, videoFile);
+
+        res.sendFile(fullPath, err => {
+            if (err) {
+                console.error("Error sending file:", err);
+                res.status(500).send("Error sending file");
+            }
+        });
+    } catch (err) {
+        console.error(err);
+        res.status(500).send("Internal error");
+    }
+});
 
 app.use("/media", express.static(MEDIA_PATH));
 
