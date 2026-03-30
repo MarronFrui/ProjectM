@@ -386,14 +386,17 @@ a {
     display: flex;
     justify-content: center;
     align-items: center;
-    height: auto;
+    margin: 2rem 0;
+    min-height: 50vh; 
 }
 
 .videoplayer {
-    width: min(95%, calc(80vh * (16 / 9)));
+    width: auto;
+    height: 60vh; 
+    max-height: 80vh; 
     aspect-ratio: 16 / 9;
-    border-radius: 8px;
-    box-shadow: 0 0 20px rgba(0, 0, 0, 0.7);
+    border-radius: 12px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.5);
 }
 
 #available-cards:empty,

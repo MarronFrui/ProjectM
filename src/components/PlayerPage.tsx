@@ -48,6 +48,8 @@ export default function PlayerPage() {
 
     if (!item) return <div>Loading...</div>;
 
+    console.log(item);
+
     return (
         <>
             <button
