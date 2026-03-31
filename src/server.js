@@ -96,7 +96,7 @@ app.get("/media/:id", async (req, res) => {
 
         const fullPath = path.join(folderPath, videoFile);
 
-        res.sendFile(fullPath, err => {
+        res.download(fullPath, (err) => {
             if (err) {
                 console.error("Error sending file:", err);
                 res.status(500).send("Error sending file");
