@@ -53,23 +53,6 @@ export default function PlayerPage() {
         };
     }, [item]);
 
-    // ONLY FOR DEBUGGING
-    useEffect(() => {
-        if (!videoRef.current) return;
-
-        const video = videoRef.current;
-
-        video.addEventListener("loadstart", () => console.log("loadstart"));
-        video.addEventListener("loadedmetadata", () =>
-            console.log("metadata loaded"),
-        );
-        video.addEventListener("canplay", () => console.log("canplay"));
-        video.addEventListener("play", () => console.log("playing"));
-        video.addEventListener("error", (e) => {
-            console.error("VIDEO ERROR:", video.error);
-        });
-    }, [item]);
-
     if (!item) return <div>Loading...</div>;
 
     console.log(item);
