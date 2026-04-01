@@ -1,5 +1,5 @@
 import { useParams, useNavigate } from "react-router-dom";
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useLayoutEffect, useState, useRef } from "react";
 import { loadContentDB, ContentItem } from "../../config";
 import { useDirectionalNavigation } from "../../hooks/useDirectionalNavigation";
 import Plyr from "plyr";
@@ -51,7 +51,7 @@ export default function PlayerPage() {
         if (item) requestAnimationFrame(focusFirst);
     }, [item]);
 
-    useEffect(() => {
+    useLayoutEffect(() => {
         if (!item || !videoRef.current) return;
 
         const video = videoRef.current;
@@ -77,29 +77,18 @@ export default function PlayerPage() {
         video.addEventListener("canplay", handleCanPlay);
 
         return () => {
+            if (playerRef.current) {
+                playerRef.current.destroy();
+                playerRef.current = null;
+            }
             video.removeEventListener("canplay", handleCanPlay);
-            playerRef.current?.destroy();
-            playerRef.current = null;
         };
-    }, [item]);
-
-    const handleTrackChange = () => {
-        if (playerRef.current) {
-            playerRef.current.destroy();
-            playerRef.current = null;
-        }
-        if (videoRef.current) {
-            videoRef.current.load();
-        }
-    };
-
-    useEffect(() => {
-        handleTrackChange();
-    }, [selectedAudio, selectedSub]);
+    }, [item, selectedAudio, selectedSub]);
 
     if (!item) return <div>Loading...</div>;
 
     const streamUrl = `${API_BASE}/stream/${id}?audio=${selectedAudio}&subtitle=${selectedSub}`;
+    const containerKey = `${id}-${selectedAudio}-${selectedSub}`;
 
     return (
         <>
@@ -166,22 +155,13 @@ export default function PlayerPage() {
             )}
 
             {item.available ? (
-                <div className="videoplayer-container">
+                <div className="videoplayer-container" key={containerKey}>
                     <video
                         ref={videoRef}
                         className="videoplayer"
                         autoPlay
                     >
                         <source src={streamUrl} type="video/mp4" />
-                        {selectedSub !== "-1" && tracks?.subtitles.find(t => String(t.track) === selectedSub) && (
-                            <track
-                                kind="subtitles"
-                                src={`${API_BASE}/subtitles/${id}/${selectedSub}`}
-                                srcLang={tracks.subtitles.find(t => String(t.track) === selectedSub)?.language}
-                                label={tracks.subtitles.find(t => String(t.track) === selectedSub)?.title}
-                                default
-                            />
-                        )}
                     </video>
                 </div>
             ) : (

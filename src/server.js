@@ -191,22 +191,20 @@ app.get("/stream/:id", async (req, res) => {
         const subtitleTrack = req.query.subtitle ?? "-1";
 
         const args = [
-            "-re",
             "-i", videoPath,
             "-map", "0:v",
             "-map", `0:a:${audioTrack}`,
-            "-c:v", "copy"
+            "-c:v", "copy",
+            "-c:a", "aac"
         ];
 
         if (subtitleTrack !== "-1") {
-            args.push("-map", `0:s:${subtitleTrack}`);
+            args.push("-map", `0:s:${subtitleTrack}`, "-c:s", "copy");
         } else {
             args.push("-map", "-0:s");
         }
 
         args.push(
-            "-c:a", "aac",
-            "-c:s", "webvtt",
             "-f", "mp4",
             "-movflags", "frag_keyframe+empty_moov",
             "pipe:1"
