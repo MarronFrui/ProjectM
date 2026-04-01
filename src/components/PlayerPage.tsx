@@ -4,9 +4,28 @@ import { loadContentDB, ContentItem } from "../../config";
 import { useDirectionalNavigation } from "../../hooks/useDirectionalNavigation";
 import Plyr from "plyr";
 
+interface Track {
+    index: number;
+    track: number;
+    language: string;
+    title: string;
+    codec: string;
+}
+
+interface Tracks {
+    audio: Track[];
+    subtitles: Track[];
+}
+
+const API_BASE = "http://192.168.5.67:3000";
+
 export default function PlayerPage() {
     const { id } = useParams();
     const [item, setItem] = useState<ContentItem | null>(null);
+    const [tracks, setTracks] = useState<Tracks | null>(null);
+    const [selectedAudio, setSelectedAudio] = useState("0");
+    const [selectedSub, setSelectedSub] = useState("-1");
+    const [showTrackMenu, setShowTrackMenu] = useState(false);
     const navigate = useNavigate();
     const { register, focusFirst } = useDirectionalNavigation();
     const videoRef = useRef<HTMLVideoElement>(null);
@@ -18,6 +37,15 @@ export default function PlayerPage() {
             if (found) setItem(found);
         });
     }, [id]);
+
+    useEffect(() => {
+        if (item) {
+            fetch(`${API_BASE}/api/tracks/${id}`)
+                .then((r) => r.json())
+                .then((t) => setTracks(t))
+                .catch(console.error);
+        }
+    }, [item, id]);
 
     useEffect(() => {
         if (item) requestAnimationFrame(focusFirst);
@@ -37,6 +65,8 @@ export default function PlayerPage() {
                     "current-time",
                     "mute",
                     "volume",
+                    "captions",
+                    "settings",
                     "fullscreen",
                 ],
                 keyboard: { focused: true, global: false },
@@ -53,10 +83,23 @@ export default function PlayerPage() {
         };
     }, [item]);
 
+    const handleTrackChange = () => {
+        if (playerRef.current) {
+            playerRef.current.destroy();
+            playerRef.current = null;
+        }
+        if (videoRef.current) {
+            videoRef.current.load();
+        }
+    };
+
+    useEffect(() => {
+        handleTrackChange();
+    }, [selectedAudio, selectedSub]);
+
     if (!item) return <div>Loading...</div>;
 
-    console.log(item);
-    console.log("VIDEO URL:", `http://192.168.5.67:3000/media/${item.id}`);
+    const streamUrl = `${API_BASE}/stream/${id}?audio=${selectedAudio}&subtitle=${selectedSub}`;
 
     return (
         <>
@@ -70,13 +113,75 @@ export default function PlayerPage() {
             </button>
             <h2>{item.name}</h2>
 
+            {tracks && (tracks.audio.length > 1 || tracks.subtitles.length > 0) && (
+                <div className="track-selector">
+                    <button onClick={() => setShowTrackMenu(!showTrackMenu)}>
+                        ⚙️ Tracks
+                    </button>
+                    {showTrackMenu && (
+                        <div className="track-menu">
+                            <div className="track-group">
+                                <h4>Audio</h4>
+                                {tracks.audio.map((t, i) => (
+                                    <label key={i}>
+                                        <input
+                                            type="radio"
+                                            name="audio"
+                                            value={t.track}
+                                            checked={selectedAudio === String(t.track)}
+                                            onChange={() => setSelectedAudio(String(t.track))}
+                                        />
+                                        {t.title} ({t.language})
+                                    </label>
+                                ))}
+                            </div>
+                            <div className="track-group">
+                                <h4>Subtitles</h4>
+                                <label>
+                                    <input
+                                        type="radio"
+                                        name="subtitle"
+                                        value="-1"
+                                        checked={selectedSub === "-1"}
+                                        onChange={() => setSelectedSub("-1")}
+                                    />
+                                    Off
+                                </label>
+                                {tracks.subtitles.map((t, i) => (
+                                    <label key={i}>
+                                        <input
+                                            type="radio"
+                                            name="subtitle"
+                                            value={t.track}
+                                            checked={selectedSub === String(t.track)}
+                                            onChange={() => setSelectedSub(String(t.track))}
+                                        />
+                                        {t.title} ({t.language})
+                                    </label>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                </div>
+            )}
+
             {item.available ? (
                 <div className="videoplayer-container">
-                    <video ref={videoRef} className="videoplayer" autoPlay>
-                        <source
-                            src={`http://192.168.5.67:3000/media/${item.id}`}
-                            type="video/mp4"
-                        />
+                    <video
+                        ref={videoRef}
+                        className="videoplayer"
+                        autoPlay
+                    >
+                        <source src={streamUrl} type="video/mp4" />
+                        {selectedSub !== "-1" && tracks?.subtitles.find(t => String(t.track) === selectedSub) && (
+                            <track
+                                kind="subtitles"
+                                src={`${API_BASE}/subtitles/${id}/${selectedSub}`}
+                                srcLang={tracks.subtitles.find(t => String(t.track) === selectedSub)?.language}
+                                label={tracks.subtitles.find(t => String(t.track) === selectedSub)?.title}
+                                default
+                            />
+                        )}
                     </video>
                 </div>
             ) : (

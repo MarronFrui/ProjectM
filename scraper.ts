@@ -109,10 +109,20 @@ async function fetchCandidates(page = 1, phase: Phase): Promise<Candidate[]> {
     return [...movies, ...series];
 }
 
-async function fetchAndBuildItem(c: Candidate): Promise<ContentItem | null> {
+async function fetchAndBuildItem(c: Candidate, forceAdd = false): Promise<ContentItem | null> {
     const key = `${c.type}-${c.id}`;
-    if (existingTmdbSet.has(key) || skippedSet.has(key)) return null;
-
+    
+    console.log(`[DEBUG] Attempting to add: ${c.title} (${key})`);
+    console.log(`[DEBUG] In existing: ${existingTmdbSet.has(key)}, In skipped: ${skippedSet.has(key)}, forceAdd: ${forceAdd}`);
+    
+    if (existingTmdbSet.has(key)) {
+        console.log(`Skipping ${c.title}: already in database`);
+        return null;
+    }
+    if (skippedSet.has(key) && !forceAdd) {
+        console.log(`Skipping ${c.title}: in skipped list`);
+        return null;
+    }
     try {
         const detailsUrl =
             c.type === "movie"
@@ -138,25 +148,25 @@ async function fetchAndBuildItem(c: Candidate): Promise<ContentItem | null> {
                 addSkipped(key);
                 return null;
             }
-        } else {
-            const runtimes = (details.episode_run_time ?? []).filter(
-                (r: number) => r > 0,
-            );
-            const avgEpisodeDuration = runtimes.length
-                ? runtimes.reduce((a: number, b: number) => a + b, 0) /
-                  runtimes.length
-                : 0;
-            const numberOfEpisodes = details.number_of_episodes ?? 0;
-            duration = Math.round(numberOfEpisodes * avgEpisodeDuration);
+         } else {
+        const runtimes = (details.episode_run_time ?? []).filter(
+            (r: number) => r > 0,
+        );
+        const avgEpisodeDuration = runtimes.length
+            ? runtimes.reduce((a: number, b: number) => a + b) /
+              runtimes.length
+            : 0;
+        const numberOfEpisodes = details.number_of_episodes ?? 0;
+        duration = Math.round(numberOfEpisodes * avgEpisodeDuration);
 
-            if (duration < 20) {
-                console.log(
-                    `Skipping ${c.title}: series too short (${duration} min)`,
-                );
-                addSkipped(key);
-                return null;
-            }
+        if (!forceAdd && duration < 20) {
+            console.log(
+                `Skipping ${c.title}: series too short (${duration} min)`,
+            );
+            addSkipped(key);
+            return null;
         }
+    }
 
         const title = details.title ?? details.name ?? c.title;
         if (!/^[\u0000-\u007F]+$/.test(title)) {
@@ -280,23 +290,20 @@ async function runPhase(phase: Phase, phaseLimit: number) {
 
 
 async function run() {
-    const readline = await import("node:readline");
-    const rl = readline.createInterface({
+    const rl = await import("node:readline");
+    const interface_ = rl.createInterface({
         input: process.stdin,
         output: process.stdout,
     });
 
     const ask = (q: string) =>
-        new Promise<string>((res) => rl.question(q, res));
+        new Promise<string>((res) => interface_.question(q, res));
 
-    const choice = await ask(
-        "Add specific content? (y/N): "
-    );
+    const choice = await ask("Add specific content? (y/N): ");
 
     if (choice.toLowerCase() === "y") {
-        rl.close();
-        const search = await import("node:readline");
-        const rl2 = search.createInterface({
+        interface_.close();
+        const rl2 = rl.createInterface({
             input: process.stdin,
             output: process.stdout,
         });
@@ -312,7 +319,7 @@ async function run() {
         });
 
         const idx = await new Promise<string>((res) => {
-            const rl3 = search.createInterface({
+            const rl3 = rl.createInterface({
                 input: process.stdin,
                 output: process.stdout,
             });
@@ -324,11 +331,15 @@ async function run() {
 
         const selected = results[parseInt(idx) - 1];
         if (selected) {
-            const item = await fetchAndBuildItem(selected);
-            if (item) console.log(`\nAdded: ${item.name}`);
+            const item = await fetchAndBuildItem(selected, true); // true = force add, bypass duration check
+            if (item) {
+                console.log(`\nAdded: ${item.name}`);
+            } else {
+                console.log(`\nFailed to add: ${selected.title}`);
+            }
         }
     } else {
-        rl.close();
+        interface_.close();
         await runPhase("top-rated", TOP_RATED_LIMIT);
         await runPhase("recent", DISCOVERY_LIMIT);
         console.log(`Completed all phases. DB now has ${contentDB.length} items.`);

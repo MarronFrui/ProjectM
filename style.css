@@ -386,7 +386,7 @@ a {
     display: flex;
     justify-content: center;
     align-items: center;
-    margin: 2rem 0;
+    margin: 2rem 6rem;
     min-height: 50vh; 
 }
 
@@ -565,4 +565,57 @@ a {
     margin-top: 1.5rem;
     text-shadow: none;
     letter-spacing: 0.05em;
+}
+
+.track-selector {
+    margin: 0 6rem 1rem;
+    position: relative;
+}
+
+.track-selector > button {
+    background: #333;
+    color: #fff;
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: 0.25rem;
+    cursor: pointer;
+}
+
+.track-menu {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    background: #222;
+    border: 1px solid #444;
+    border-radius: 0.5rem;
+    padding: 1rem;
+    display: flex;
+    gap: 2rem;
+    z-index: 50;
+    min-width: 200px;
+}
+
+.track-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.track-group h4 {
+    margin: 0 0 0.5rem;
+    color: #e50914;
+    font-size: 0.9rem;
+}
+
+.track-group label {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    cursor: pointer;
+    font-size: 0.9rem;
+    color: #ccc;
+}
+
+.track-group input[type="radio"] {
+    accent-color: #e50914;
 }
