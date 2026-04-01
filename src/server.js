@@ -125,7 +125,7 @@ async function getVideoPath(itemId) {
 
 async function getTrackInfo(itemId) {
     const videoPath = await getVideoPath(itemId);
-    if (!videoPath) return null && console.log("!videopath");
+    if (!videoPath) return null && console.log("!vid");
 
     return new Promise((resolve) => {
         const ffprobe = spawn("ffprobe", [
