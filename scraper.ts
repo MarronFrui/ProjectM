@@ -88,6 +88,8 @@ async function fetchCandidates(page = 1, phase: Phase): Promise<Candidate[]> {
     const movieData = await fetchJSON(movieURL);
     const tvData = await fetchJSON(tvURL);
 
+
+
     const movies = (movieData.results ?? []).map((r: any) => ({
         id: r.id,
         title: r.title ?? r.name,
@@ -220,6 +222,34 @@ async function fetchAndBuildItem(c: Candidate): Promise<ContentItem | null> {
     }
 }
 
+async function searchTMDB(query: string): Promise<Candidate[]> {
+    const movieUrl = `${BASE_URL}/search/movie?api_key=${API_KEY}&query=${encodeURIComponent(query)}`;
+    const tvUrl = `${BASE_URL}/search/tv?api_key=${API_KEY}&query=${encodeURIComponent(query)}`;
+
+    const [movieData, tvData] = await Promise.all([
+        fetchJSON(movieUrl),
+        fetchJSON(tvUrl),
+    ]);
+
+    const movies = (movieData.results ?? []).map((r: any) => ({
+        id: r.id,
+        title: r.title ?? r.name,
+        type: "movie" as const,
+        releaseDate: r.release_date ?? "",
+        rating: r.vote_average ?? 0,
+    }));
+
+    const series = (tvData.results ?? []).map((r: any) => ({
+        id: r.id,
+        title: r.name,
+        type: "tv" as const,
+        releaseDate: r.first_air_date ?? "",
+        rating: r.vote_average ?? 0,
+    }));
+
+    return [...movies, ...series];
+}
+
 async function runPhase(phase: Phase, phaseLimit: number) {
     let added = 0;
     let page = 1;
@@ -247,11 +277,62 @@ async function runPhase(phase: Phase, phaseLimit: number) {
     console.log(`Phase ${phase} finished. Added ${added} new items.`);
 }
 
-async function run() {
-    await runPhase("top-rated", TOP_RATED_LIMIT);
-    await runPhase("recent", DISCOVERY_LIMIT);
 
-    console.log(`Completed all phases. DB now has ${contentDB.length} items.`);
+
+async function run() {
+    const readline = await import("node:readline");
+    const rl = readline.createInterface({
+        input: process.stdin,
+        output: process.stdout,
+    });
+
+    const ask = (q: string) =>
+        new Promise<string>((res) => rl.question(q, res));
+
+    const choice = await ask(
+        "Add specific content? (y/N): "
+    );
+
+    if (choice.toLowerCase() === "y") {
+        rl.close();
+        const search = await import("node:readline");
+        const rl2 = search.createInterface({
+            input: process.stdin,
+            output: process.stdout,
+        });
+        const query = await new Promise<string>((res) =>
+            rl2.question("Search: ", res)
+        );
+        rl2.close();
+
+        const results = await searchTMDB(query);
+        console.log(`\nFound ${results.length} results:\n`);
+        results.forEach((r, i) => {
+            console.log(`${i + 1}. ${r.title} (${r.type}) - ${r.releaseDate.slice(0, 4)}`);
+        });
+
+        const idx = await new Promise<string>((res) => {
+            const rl3 = search.createInterface({
+                input: process.stdin,
+                output: process.stdout,
+            });
+            rl3.question("\nSelect number to add (0 to skip): ", (a) => {
+                rl3.close();
+                res(a);
+            });
+        });
+
+        const selected = results[parseInt(idx) - 1];
+        if (selected) {
+            const item = await fetchAndBuildItem(selected);
+            if (item) console.log(`\nAdded: ${item.name}`);
+        }
+    } else {
+        rl.close();
+        await runPhase("top-rated", TOP_RATED_LIMIT);
+        await runPhase("recent", DISCOVERY_LIMIT);
+        console.log(`Completed all phases. DB now has ${contentDB.length} items.`);
+    }
 }
 
 run().catch((err) => {

@@ -7,3 +7,10 @@ interface ImportMetaEnv {
 interface ImportMeta {
     readonly env: ImportMetaEnv
 }
+
+declare module "plyr" {
+    export default class Plyr {
+        constructor(element: HTMLVideoElement, options?: any);
+        destroy(): void;
+    }
+}
