@@ -36,6 +36,7 @@ export default function PlayerPage() {
     const [externalSubs, setExternalSubs] = useState<ExternalSubtitle[]>([]);
     const [selectedAudio, setSelectedAudio] = useState("0");
     const [showTrackMenu, setShowTrackMenu] = useState(false);
+    const [isReady, setIsReady] = useState(false);
     const navigate = useNavigate();
     const { register, focusFirst } = useDirectionalNavigation();
     const videoRef = useRef<HTMLVideoElement>(null);
@@ -49,31 +50,27 @@ export default function PlayerPage() {
     }, [id]);
 
     useEffect(() => {
-        if (item && id) {
-            fetch(`${API_BASE}/api/tracks/${id}`)
-                .then((r) => r.json())
-                .then((t) => setAudioTracks(t))
-                .catch(console.error);
+        if (!item || !id) return;
 
-            fetch(`${API_BASE}/api/subtitles-available/${id}`)
-                .then((r) => r.json())
-                .then((available) => {
-                    const subs: ExternalSubtitle[] = [];
-                    for (const sub of available) {
-                        if (sub.lang === "en" || sub.lang === "fr") {
-                            subs.push({
-                                lang: sub.lang,
-                                label:
-                                    LANG_LABELS[sub.lang] ||
-                                    sub.lang.toUpperCase(),
-                                src: `${API_BASE}/api/subtitles/${id}?lang=${sub.lang}`,
-                            });
-                        }
-                    }
-                    setExternalSubs(subs);
-                })
-                .catch(console.error);
-        }
+        Promise.all([
+            fetch(`${API_BASE}/api/tracks/${id}`).then((r) => r.json()),
+            fetch(`${API_BASE}/api/subtitles-available/${id}`).then((r) => r.json()),
+        ]).then(([tracks, available]) => {
+            setAudioTracks(tracks);
+
+            const subs: ExternalSubtitle[] = [];
+            for (const sub of available) {
+                if (sub.lang === "en" || sub.lang === "fr") {
+                    subs.push({
+                        lang: sub.lang,
+                        label: LANG_LABELS[sub.lang] || sub.lang.toUpperCase(),
+                        src: `${API_BASE}/api/subtitles/${id}?lang=${sub.lang}`,
+                    });
+                }
+            }
+            setExternalSubs(subs);
+            setIsReady(true);
+        });
     }, [item, id]);
 
     useEffect(() => {
@@ -81,60 +78,40 @@ export default function PlayerPage() {
     }, [item]);
 
     useLayoutEffect(() => {
-        if (!item || !videoRef.current) return;
+        if (!item || !videoRef.current || !isReady) return;
 
-        const video = videoRef.current;
+        const player = new Plyr(videoRef.current, {
+            controls: [
+                "play-large",
+                "play",
+                "progress",
+                "current-time",
+                "mute",
+                "volume",
+                "captions",
+                "settings",
+                "fullscreen",
+            ],
+            keyboard: { focused: true, global: false },
+            ratio: "16:9",
+        });
 
-        const handleCanPlay = () => {
-            const player = new Plyr(video, {
-                controls: [
-                    "play-large",
-                    "play",
-                    "progress",
-                    "current-time",
-                    "mute",
-                    "volume",
-                    "captions",
-                    "settings",
-                    "fullscreen",
-                ],
-                keyboard: { focused: true, global: false },
-                ratio: "16:9",
-            });
+        playerRef.current = player;
 
-            player.source = {
-                type: "video",
-                sources: [{ src: video.src, type: "video/mp4" }],
-                tracks: externalSubs.map((sub) => ({
-                    kind: "captions",
-                    label: sub.label,
-                    srclang: sub.lang,
-                    src: sub.src,
-                })),
-            };
-
-            playerRef.current = player;
-
-            console.log("[PLYR] Initialized with tracks");
-            console.log("[PLYR] Text tracks:", video.textTracks.length);
-            for (let i = 0; i < video.textTracks.length; i++) {
-                const t = video.textTracks[i];
-                console.log(
-                    `  Track ${i}: kind=${t.kind}, label=${t.label}, lang=${t.language}, mode=${t.mode}`,
-                );
-            }
-        };
-
-        video.addEventListener("canplay", handleCanPlay);
+        console.log("[PLYR] Initialized");
+        console.log("[PLYR] Text tracks:", videoRef.current.textTracks.length);
+        for (let i = 0; i < videoRef.current.textTracks.length; i++) {
+            const t = videoRef.current.textTracks[i];
+            console.log(
+                `  Track ${i}: kind=${t.kind}, label=${t.label}, lang=${t.language}, mode=${t.mode}`
+            );
+        }
 
         return () => {
-            if (playerRef.current) {
-                playerRef.current.destroy();
-                playerRef.current = null;
-            }
-            video.removeEventListener("canplay", handleCanPlay);
+            player.destroy();
+            playerRef.current = null;
         };
-    }, [item]);
+    }, [item, isReady]);
 
     if (!item) return <div>Loading...</div>;
 
@@ -155,7 +132,7 @@ export default function PlayerPage() {
             {(audioTracks?.audio.length ?? 0) > 1 && (
                 <div className="track-selector">
                     <button onClick={() => setShowTrackMenu(!showTrackMenu)}>
-                        ⚙️ Tracks
+                        ⚙️ Audio
                     </button>
                     {showTrackMenu && (
                         <div className="track-menu">
@@ -167,15 +144,8 @@ export default function PlayerPage() {
                                             type="radio"
                                             name="audio"
                                             value={t.track}
-                                            checked={
-                                                selectedAudio ===
-                                                String(t.track)
-                                            }
-                                            onChange={() =>
-                                                setSelectedAudio(
-                                                    String(t.track),
-                                                )
-                                            }
+                                            checked={selectedAudio === String(t.track)}
+                                            onChange={() => setSelectedAudio(String(t.track))}
                                         />
                                         {t.title} ({t.language})
                                     </label>
@@ -187,20 +157,56 @@ export default function PlayerPage() {
             )}
 
             {item.available ? (
-                <div className="videoplayer-container">
-                    <video ref={videoRef} className="videoplayer" autoPlay>
-                        <source src={streamUrl} type="video/mp4" />
-                        {externalSubs.map((sub) => (
-                            <track
-                                key={sub.lang}
-                                kind="subtitles"
-                                src={sub.src}
-                                srcLang={sub.lang}
-                                label={sub.label}
-                            />
-                        ))}
-                    </video>
-                </div>
+                isReady ? (
+                    <div className="videoplayer-container">
+                        <video
+                            ref={videoRef}
+                            className="videoplayer"
+                            autoPlay
+                        >
+                            <source src={streamUrl} type="video/mp4" />
+                            {externalSubs.map((sub) => (
+                                <track
+                                    key={sub.lang}
+                                    kind="captions"
+                                    label={sub.label}
+                                    src={sub.src}
+                                    srcLang={sub.lang}
+                                />
+                            ))}
+                        </video>
+                    </div>
+                ) : (
+                    <div
+                        style={{
+                            display: "flex",
+                            justifyContent: "center",
+                            alignItems: "center",
+                            height: "400px",
+                            background: "#1a1a1a",
+                            borderRadius: "8px",
+                        }}
+                    >
+                        <div
+                            style={{
+                                width: "50px",
+                                height: "50px",
+                                border: "4px solid #333",
+                                borderTop: "4px solid #00b3ff",
+                                borderRadius: "50%",
+                                animation: "spin 1s linear infinite",
+                            }}
+                        />
+                        <style>
+                            {`
+                                @keyframes spin {
+                                    0% { transform: rotate(0deg); }
+                                    100% { transform: rotate(360deg); }
+                                }
+                            `}
+                        </style>
+                    </div>
+                )
             ) : (
                 <p style={{ marginLeft: "2rem" }}>No media file available.</p>
             )}
