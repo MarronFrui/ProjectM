@@ -11,7 +11,25 @@ app.use(cors());
 
 const MEDIA_PATH = "/mnt/media";
 const DB_PATH = path.resolve(__dirname, "../content-info/contentDB.json");
+
+const envPath = path.resolve(__dirname, "../.env");
+let OPENSUBTITLES_API_KEY = "";
+try {
+    const envContent = await fs.readFile(envPath, "utf-8");
+    for (const line of envContent.split("\n")) {
+        const [key, ...valueParts] = line.split("=");
+        if (key && valueParts.length > 0) {
+            if (key.trim() === "OPENSUBTITLES_API_KEY") {
+                OPENSUBTITLES_API_KEY = valueParts.join("=").trim();
+            }
+        }
+    }
+} catch (e) {
+    console.warn("Could not read .env file:", e.message);
+}
+
 console.log("Resolved DB path:", DB_PATH);
+console.log("OpenSubtitles API Key loaded:", OPENSUBTITLES_API_KEY ? "Yes" : "No");
 
 function normalize(str) {
     return str
@@ -153,17 +171,7 @@ async function getTrackInfo(itemId) {
                         codec: s.codec_name
                     }));
 
-                const subtitles = streams
-                    .filter((s) => s.codec_type === "subtitle")
-                    .map((s, i) => ({
-                        index: i,
-                        track: streams.filter(sub => s.codec_type === "subtitle").indexOf(s),
-                        language: s.tags?.language || "unknown",
-                        title: s.tags?.title || `Subtitle ${i + 1}`,
-                        codec: s.codec_name
-                    }));
-
-                resolve({ audio, subtitles });
+                resolve({ audio });
             } catch {
                 resolve(null);
             }
@@ -228,6 +236,201 @@ app.get("/stream/:id", async (req, res) => {
     } catch (err) {
         console.error(err);
         res.status(500).send("Internal error");
+    }
+});
+
+async function getMediaFolderPath(itemId) {
+    console.log(`[SUBTITLE] getMediaFolderPath called with: ${itemId}`);
+    const copyDB = await loadContentWithPaths();
+    const item = copyDB.find((i) => i.id === itemId);
+    if (!item || !item.filePath) {
+        console.log(`[SUBTITLE] Item not found in DB: ${itemId}`);
+        return null;
+    }
+    const folderPath = path.join(MEDIA_PATH, path.basename(item.filePath));
+    console.log(`[SUBTITLE] Media folder: ${folderPath}`);
+    return folderPath;
+}
+
+async function getSubtitleCachePath(itemId, lang) {
+    console.log(`[SUBTITLE] getSubtitleCachePath called: ${itemId}, ${lang}`);
+    const folderPath = await getMediaFolderPath(itemId);
+    if (!folderPath) return null;
+    const vttPath = path.join(folderPath, "subs", `${lang}.vtt`);
+    console.log(`[SUBTITLE] VTT path: ${vttPath}`);
+    return vttPath;
+}
+
+async function searchSubtitles(tmdbId, lang) {
+    console.log(`[SUBTITLE] searchSubtitles: tmdbId=${tmdbId}, lang=${lang}`);
+    const url = `https://api.opensubtitles.com/api/v1/subtitles?tmdb_id=${tmdbId}&languages=${lang}`;
+    console.log(`[SUBTITLE] OpenSubtitles search URL: ${url}`);
+
+    const response = await fetch(url, {
+        headers: {
+            "Api-Key": OPENSUBTITLES_API_KEY,
+            "User-Agent": "ProjectM v1.0",
+            "Accept": "application/json"
+        }
+    });
+
+    console.log(`[SUBTITLE] OpenSubtitles search status: ${response.status}`);
+
+    if (!response.ok) {
+        const text = await response.text();
+        console.error(`[SUBTITLE] API error response:`, text);
+        throw new Error(`OpenSubtitles API error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    console.log(`[SUBTITLE] OpenSubtitles search response:`, JSON.stringify(data, null, 2).substring(0, 1000));
+
+    if (!data.data || data.data.length === 0) {
+        throw new Error("No subtitles found");
+    }
+
+    const firstResult = data.data[0];
+    const fileId = firstResult?.attributes?.files?.[0]?.file_id;
+    
+    if (!fileId) {
+        throw new Error("No file_id in search results");
+    }
+
+    return fileId;
+}
+
+async function downloadSubtitle(fileId) {
+    console.log(`[SUBTITLE] downloadSubtitle: fileId=${fileId}`);
+    const response = await fetch("https://api.opensubtitles.com/api/v1/download", {
+        method: "POST",
+        headers: {
+            "Api-Key": OPENSUBTITLES_API_KEY,
+            "User-Agent": "ProjectM v1.0",
+            "Content-Type": "application/json",
+            "Accept": "application/json"
+        },
+        body: JSON.stringify({ file_id: fileId })
+    });
+
+    console.log(`[SUBTITLE] OpenSubtitles download status: ${response.status}`);
+
+    if (!response.ok) {
+        throw new Error(`OpenSubtitles download error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    console.log(`[SUBTITLE] Download link received: ${data.link}`);
+
+    return data.link;
+}
+
+async function fetchSubtitleFromOpenSubtitles(tmdbId, lang) {
+    console.log(`[SUBTITLE] fetchSubtitleFromOpenSubtitles: tmdbId=${tmdbId}, lang=${lang}`);
+    const fileId = await searchSubtitles(tmdbId, lang);
+    const downloadLink = await downloadSubtitle(fileId);
+    return downloadLink;
+}
+
+function srtToVtt(srtContent) {
+    const lines = srtContent.split("\n");
+    const vttLines = ["WEBVTT", ""];
+    
+    for (const line of lines) {
+        vttLines.push(line);
+    }
+    
+    return vttLines.join("\n");
+}
+
+async function downloadAndConvertToVTT(subtitleUrl, vttPath) {
+    console.log(`[SUBTITLE] downloadAndConvertToVTT: ${subtitleUrl} -> ${vttPath}`);
+    const subsDir = path.dirname(vttPath);
+    await fs.mkdir(subsDir, { recursive: true });
+
+    const response = await fetch(subtitleUrl);
+    if (!response.ok) {
+        throw new Error(`Failed to download subtitle: ${response.status}`);
+    }
+
+    const srtContent = await response.text();
+    
+    const vttContent = srtToVtt(srtContent);
+    await fs.writeFile(vttPath, vttContent);
+    console.log(`[SUBTITLE] VTT created: ${vttPath}`);
+
+    return vttPath;
+}
+
+app.get("/api/subtitles/:id", async (req, res) => {
+    try {
+        const { id } = req.params;
+        const lang = req.query.lang || "en";
+        console.log(`[SUBTITLE] /api/subtitles/${id}?lang=${lang}`);
+
+        res.setHeader("Access-Control-Allow-Origin", "*");
+        res.setHeader("Content-Type", "text/vtt");
+
+        const vttPath = await getSubtitleCachePath(id, lang);
+        if (!vttPath) {
+            console.log(`[SUBTITLE] Media not found`);
+            return res.status(404).json({ error: "Media not found" });
+        }
+
+        try {
+            await fs.access(vttPath);
+            console.log(`[SUBTITLE] Returning cached VTT: ${vttPath}`);
+            return res.sendFile(vttPath);
+        } catch {
+            console.log(`[SUBTITLE] VTT not cached, fetching from OpenSubtitles...`);
+        }
+
+        const tmdbId = id.replace(/^(movie|tv)-/, "");
+        console.log(`[SUBTITLE] TMDB ID: ${tmdbId}`);
+        
+        const subtitleUrl = await fetchSubtitleFromOpenSubtitles(tmdbId, lang);
+        console.log(`[SUBTITLE] Got subtitle URL: ${subtitleUrl}`);
+        
+        const savedPath = await downloadAndConvertToVTT(subtitleUrl, vttPath);
+        console.log(`[SUBTITLE] Saved and returning: ${savedPath}`);
+        
+        res.sendFile(savedPath);
+
+    } catch (err) {
+        console.error("[SUBTITLE] Error:", err.message);
+        res.status(500).json({ error: "Failed to fetch subtitle" });
+    }
+});
+
+app.get("/api/subtitles-available/:id", async (req, res) => {
+    try {
+        const { id } = req.params;
+        console.log(`[SUBTITLE] /api/subtitles-available/${id}`);
+        const langs = ["en", "fr"];
+        const available = [];
+
+        for (const lang of langs) {
+            const vttPath = await getSubtitleCachePath(id, lang);
+            
+            if (vttPath) {
+                try {
+                    await fs.access(vttPath);
+                    console.log(`[SUBTITLE] Found cached VTT for ${lang}: ${vttPath}`);
+                    available.push({ lang, cached: true });
+                } catch {
+                    console.log(`[SUBTITLE] No subtitle for ${lang}`);
+                    available.push({ lang, cached: false });
+                }
+            } else {
+                console.log(`[SUBTITLE] No path found for ${lang}`);
+                available.push({ lang, cached: false });
+            }
+        }
+
+        console.log(`[SUBTITLE] Returning available:`, available);
+        res.json(available);
+    } catch (err) {
+        console.error("[SUBTITLE] Check error:", err);
+        res.status(500).json({ error: "Failed to check subtitles" });
     }
 });
 
