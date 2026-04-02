@@ -36,7 +36,6 @@ export default function PlayerPage() {
     const [externalSubs, setExternalSubs] = useState<ExternalSubtitle[]>([]);
     const [selectedAudio, setSelectedAudio] = useState("0");
     const [showTrackMenu, setShowTrackMenu] = useState(false);
-    const [isReady, setIsReady] = useState(false);
     const navigate = useNavigate();
     const { register, focusFirst } = useDirectionalNavigation();
     const videoRef = useRef<HTMLVideoElement>(null);
@@ -50,68 +49,79 @@ export default function PlayerPage() {
     }, [id]);
 
     useEffect(() => {
-        if (!item || !id) return;
+        if (item && id) {
+            fetch(`${API_BASE}/api/tracks/${id}`)
+                .then((r) => r.json())
+                .then((t) => setAudioTracks(t))
+                .catch(console.error);
 
-        Promise.all([
-            fetch(`${API_BASE}/api/tracks/${id}`).then((r) => r.json()),
-            fetch(`${API_BASE}/api/subtitles-available/${id}`).then((r) => r.json()),
-        ]).then(([tracks, available]) => {
-            setAudioTracks(tracks);
-
-            const subs: ExternalSubtitle[] = [];
-            for (const sub of available) {
-                if (sub.lang === "en" || sub.lang === "fr") {
-                    subs.push({
-                        lang: sub.lang,
-                        label: LANG_LABELS[sub.lang] || sub.lang.toUpperCase(),
-                        src: `${API_BASE}/api/subtitles/${id}?lang=${sub.lang}`,
-                    });
-                }
-            }
-            setExternalSubs(subs);
-            setIsReady(true);
-        });
+            fetch(`${API_BASE}/api/subtitles-available/${id}`)
+                .then((r) => r.json())
+                .then((available) => {
+                    const subs: ExternalSubtitle[] = [];
+                    for (const sub of available) {
+                        if (sub.lang === "en" || sub.lang === "fr") {
+                            subs.push({
+                                lang: sub.lang,
+                                label: LANG_LABELS[sub.lang] || sub.lang.toUpperCase(),
+                                src: `${API_BASE}/api/subtitles/${id}?lang=${sub.lang}`,
+                            });
+                        }
+                    }
+                    setExternalSubs(subs);
+                })
+                .catch(console.error);
+        }
     }, [item, id]);
 
     useEffect(() => {
         if (item) requestAnimationFrame(focusFirst);
     }, [item]);
 
+
+
     useLayoutEffect(() => {
-        if (!item || !videoRef.current || !isReady) return;
+        if (!item || !videoRef.current) return;
 
-        const player = new Plyr(videoRef.current, {
-            controls: [
-                "play-large",
-                "play",
-                "progress",
-                "current-time",
-                "mute",
-                "volume",
-                "captions",
-                "settings",
-                "fullscreen",
-            ],
-            keyboard: { focused: true, global: false },
-            ratio: "16:9",
-        });
+        const video = videoRef.current;
 
-        playerRef.current = player;
+        const handleCanPlay = () => {
+            playerRef.current = new Plyr(video, {
+                controls: [
+                    "play-large",
+                    "play",
+                    "progress",
+                    "current-time",
+                    "mute",
+                    "volume",
+                    "captions",
+                    "settings",
+                    "fullscreen",
+                ],
+                caption: { update: true},
+                storage: { enabled: false},
+                keyboard: { focused: true, global: false },
+                ratio: "16:9",
+            });
 
-        console.log("[PLYR] Initialized");
-        console.log("[PLYR] Text tracks:", videoRef.current.textTracks.length);
-        for (let i = 0; i < videoRef.current.textTracks.length; i++) {
-            const t = videoRef.current.textTracks[i];
-            console.log(
-                `  Track ${i}: kind=${t.kind}, label=${t.label}, lang=${t.language}, mode=${t.mode}`
-            );
-        }
+            console.log("[PLYR] Initialized");
+            console.log("[PLYR] Text tracks:", video.textTracks.length);
+            for (let i = 0; i < video.textTracks.length; i++) {
+                const t = video.textTracks[i];
+                console.log(`  Track ${i}: kind=${t.kind}, label=${t.label}, lang=${t.language}, mode=${t.mode}`);
+            }
+        };
+
+        video.addEventListener("canplay", handleCanPlay);
 
         return () => {
-            player.destroy();
-            playerRef.current = null;
+            if (playerRef.current) {
+                playerRef.current.destroy();
+                playerRef.current = null;
+            }
+            video.removeEventListener("canplay", handleCanPlay);
         };
-    }, [item, isReady]);
+    }, [item]);
 
     if (!item) return <div>Loading...</div>;
 
@@ -157,56 +167,24 @@ export default function PlayerPage() {
             )}
 
             {item.available ? (
-                isReady ? (
-                    <div className="videoplayer-container">
-                        <video
-                            ref={videoRef}
-                            className="videoplayer"
-                            autoPlay
-                        >
-                            <source src={streamUrl} type="video/mp4" />
-                            {externalSubs.map((sub) => (
-                                <track
-                                    key={sub.lang}
-                                    kind="captions"
-                                    label={sub.label}
-                                    src={sub.src}
-                                    srcLang={sub.lang}
-                                />
-                            ))}
-                        </video>
-                    </div>
-                ) : (
-                    <div
-                        style={{
-                            display: "flex",
-                            justifyContent: "center",
-                            alignItems: "center",
-                            height: "400px",
-                            background: "#1a1a1a",
-                            borderRadius: "8px",
-                        }}
+                <div className="videoplayer-container">
+                    <video
+                        ref={videoRef}
+                        className="videoplayer"
+                        autoPlay
                     >
-                        <div
-                            style={{
-                                width: "50px",
-                                height: "50px",
-                                border: "4px solid #333",
-                                borderTop: "4px solid #00b3ff",
-                                borderRadius: "50%",
-                                animation: "spin 1s linear infinite",
-                            }}
-                        />
-                        <style>
-                            {`
-                                @keyframes spin {
-                                    0% { transform: rotate(0deg); }
-                                    100% { transform: rotate(360deg); }
-                                }
-                            `}
-                        </style>
-                    </div>
-                )
+                        <source src={streamUrl} type="video/mp4" />
+                        {externalSubs.map((sub) => (
+                            <track
+                                key={sub.lang}
+                                kind="subtitles"
+                                src={sub.src}
+                                srcLang={sub.lang}
+                                label={sub.label}
+                            />
+                        ))}
+                    </video>
+                </div>
             ) : (
                 <p style={{ marginLeft: "2rem" }}>No media file available.</p>
             )}
