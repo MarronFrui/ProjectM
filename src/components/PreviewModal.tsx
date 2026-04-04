@@ -17,12 +17,15 @@ export default function PreviewModal({
     registerModal: (el: HTMLElement | null) => void;
     focusFirstModal: () => void;
 }) {
-
- const navigate = useNavigate();
+    const navigate = useNavigate();
 
     useEffect(() => {
         focusFirstModal();
     }, []);
+
+    const handlePlay = () => {
+        navigate(`/player/${item.id}`);
+    };
 
   return (
     <div id="preview-modal" className="active">
@@ -63,7 +66,7 @@ export default function PreviewModal({
           <button
             ref={registerModal}
             id="play-button"
-            onClick={() => navigate(`/player/${item.id}`)}
+            onClick={handlePlay}
           >
             Play
           </button>

@@ -16,6 +16,7 @@ export default function App() {
                     <Route path="/category/:genre" element={<HomePage />} />
                     <Route path="/wishlist" element={<WishlistPage />} />
                     <Route path="/player/:id" element={<PlayerPage />} />
+                    <Route path="/player/:id/:file" element={<PlayerPage />} />
                     <Route path="/login" element={<LoginPage />} />
                 </Routes>
             </BrowserRouter>

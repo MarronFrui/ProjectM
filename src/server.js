@@ -52,21 +52,88 @@ function matches(file, itemName) {
     return overlap.length >= Math.ceil(iWords.length * 0.6);
 }
 
+function normalizeMediaPath(requestedFile) {
+    if (!requestedFile) return null;
+    return requestedFile.replace(/^\/media\//, "");
+}
+
+async function scanMediaFolder(folderPath, isTvShow) {
+    const result = {
+        videos: [],
+        subtitles: [],
+        folderPath: path.basename(folderPath)
+    };
+
+    try {
+        if (!isTvShow) {
+            const files = await fs.readdir(folderPath);
+            for (const file of files) {
+                const fullPath = path.join(folderPath, file);
+                const stat = await fs.stat(fullPath);
+                if (stat.isFile()) {
+                    if (/\.(mp4|mkv|avi|mov|webm)$/i.test(file)) {
+                        result.videos.push(`/media/${path.basename(folderPath)}/${file}`);
+                    } else if (/\.vtt$/i.test(file)) {
+                        result.subtitles.push(`/media/${path.basename(folderPath)}/${file}`);
+                    }
+                }
+            }
+        } else {
+            const entries = await fs.readdir(folderPath);
+            for (const entry of entries) {
+                const entryPath = path.join(folderPath, entry);
+                const stat = await fs.stat(entryPath);
+
+                if (stat.isDirectory()) {
+                    const seasonFiles = await fs.readdir(entryPath);
+                    for (const file of seasonFiles) {
+                        const filePath = path.join(entryPath, file);
+                        const fileStat = await fs.stat(filePath);
+                        if (fileStat.isFile()) {
+                            if (/\.(mp4|mkv|avi|mov|webm)$/i.test(file)) {
+                                result.videos.push(`/media/${path.basename(folderPath)}/${entry}/${file}`);
+                            } else if (/\.vtt$/i.test(file)) {
+                                result.subtitles.push(`/media/${path.basename(folderPath)}/${entry}/${file}`);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    } catch (err) {
+        console.error(`Error scanning folder ${folderPath}:`, err.message);
+    }
+
+    return result;
+}
+
 app.get("/api/content-availability", async (req, res) => {
     try {
         const raw = await fs.readFile(DB_PATH, "utf-8");
         const contentDB = JSON.parse(raw);
         const files = await fs.readdir(MEDIA_PATH);
 
-        const items = contentDB.map((item) => {
+        const items = await Promise.all(contentDB.map(async (item) => {
             const match = files.find((f) => matches(f, item.name));
+
+            if (!match) {
+                return {
+                    ...item,
+                    available: false,
+                    mediaFiles: null,
+                };
+            }
+
+            const isTvShow = item.seasons !== null;
+            const folderPath = path.join(MEDIA_PATH, match);
+            const mediaFiles = await scanMediaFolder(folderPath, isTvShow);
 
             return {
                 ...item,
-                available: !!match,
-                filePath: match ? `/media/${match}` : null,
+                available: mediaFiles.videos.length > 0,
+                mediaFiles,
             };
-        });
+        }));
 
         res.json(items);
     } catch (err) {
@@ -78,42 +145,48 @@ app.get("/api/content-availability", async (req, res) => {
 async function loadContentWithPaths() {
     const raw = await fs.readFile(DB_PATH, "utf-8");
     const contentDB = JSON.parse(raw);
-
     const files = await fs.readdir(MEDIA_PATH);
 
-    const updatedDb = contentDB.map((item) => {
+    const updatedDb = await Promise.all(contentDB.map(async (item) => {
         const match = files.find((f) => matches(f, item.name));
+
+        if (!match) {
+            return { ...item, available: false, mediaFiles: null };
+        }
+
+        const isTvShow = item.seasons !== null;
+        const folderPath = path.join(MEDIA_PATH, match);
+        const mediaFiles = await scanMediaFolder(folderPath, isTvShow);
+
         return {
             ...item,
-            filePath: match ? `/media/${match}` : null,
+            available: mediaFiles.videos.length > 0,
+            mediaFiles,
         };
-    });
+    }));
 
     return updatedDb;
 }
 
 app.get("/media/:id", async (req, res) => {
     try {
-        const copyDB = await loadContentWithPaths(); 
+        const requestedFile = req.query.file;
+        const copyDB = await loadContentWithPaths();
         const item = copyDB.find(i => i.id === req.params.id);
 
-        if (!item || !item.filePath)
-            return res.status(404).send("File not found");
+        if (!item)
+            return res.status(404).send("Item not found");
 
-        // The folder where the media is stored
-        const folderName = path.basename(item.filePath);
-        const folderPath = path.join(MEDIA_PATH, folderName);
+        let fullPath;
+        if (requestedFile) {
+            fullPath = path.join(MEDIA_PATH, normalizeMediaPath(requestedFile));
+        } else {
+            if (!item.mediaFiles || item.mediaFiles.videos.length === 0)
+                return res.status(404).send("No video file found");
 
-        // Read all files in the folder
-        const files = await fs.readdir(folderPath);
-
-        const videoFile = files.find(f =>
-            /\.(mp4|mkv|avi|mov|webm)$/i.test(f)
-        );
-
-        if (!videoFile) return res.status(404).send("No video file found");
-
-        const fullPath = path.join(folderPath, videoFile);
+            const videoPath = item.mediaFiles.videos[0];
+            fullPath = path.join(MEDIA_PATH, normalizeMediaPath(videoPath));
+        }
 
         res.download(fullPath, (err) => {
             if (err) {
@@ -129,20 +202,23 @@ app.get("/media/:id", async (req, res) => {
 
 app.use("/media", express.static(MEDIA_PATH));
 
-async function getVideoPath(itemId) {
+async function getVideoPath(itemId, requestedFile = null) {
     const copyDB = await loadContentWithPaths();
     const item = copyDB.find((i) => i.id === itemId);
-    if (!item || !item.filePath) return null;
+    if (!item) return null;
 
-    const folderPath = path.join(MEDIA_PATH, path.basename(item.filePath));
-    const files = await fs.readdir(folderPath);
-    const videoFile = files.find((f) => /\.(mp4|mkv|avi|mov|webm)$/i.test(f));
+    if (requestedFile) {
+        return path.join(MEDIA_PATH, normalizeMediaPath(requestedFile));
+    }
 
-    return videoFile ? path.join(folderPath, videoFile) : null;
+    if (!item.mediaFiles || item.mediaFiles.videos.length === 0) return null;
+
+    const videoPath = item.mediaFiles.videos[0];
+    return path.join(MEDIA_PATH, normalizeMediaPath(videoPath));
 }
 
-async function getTrackInfo(itemId) {
-    const videoPath = await getVideoPath(itemId);
+async function getTrackInfo(itemId, requestedFile = null) {
+    const videoPath = await getVideoPath(itemId, requestedFile);
     if (!videoPath) return null && console.log("!vid");
 
     return new Promise((resolve) => {
@@ -163,11 +239,11 @@ async function getTrackInfo(itemId) {
 
                 const audio = streams
                     .filter((s) => s.codec_type === "audio")
-                    .map((s, i) => ({
-                        index: i,
-                        track: streams.filter(a => a.codec_type === "audio").indexOf(s),
+                    .map((s) => ({
+                        index: streams.indexOf(s),
+                        track: streams.indexOf(s),
                         language: s.tags?.language || "unknown",
-                        title: s.tags?.title || `Audio ${i + 1}`,
+                        title: s.tags?.title || `Audio ${streams.indexOf(s) + 1}`,
                         codec: s.codec_name
                     }));
 
@@ -181,7 +257,8 @@ async function getTrackInfo(itemId) {
 
 app.get("/api/tracks/:id", async (req, res) => {
     try {
-        const tracks = await getTrackInfo(req.params.id);
+        const requestedFile = req.query.file || null;
+        const tracks = await getTrackInfo(req.params.id, requestedFile);
         if (!tracks) return res.status(404).json({ error: "Not found" });
         res.json(tracks);
     } catch (err) {
@@ -192,7 +269,8 @@ app.get("/api/tracks/:id", async (req, res) => {
 
 app.get("/stream/:id", async (req, res) => {
     try {
-        const videoPath = await getVideoPath(req.params.id);
+        const requestedFile = req.query.file || null;
+        const videoPath = await getVideoPath(req.params.id, requestedFile);
         if (!videoPath) return res.status(404).send("File not found");
 
         const audioTrack = req.query.audio ?? "0";
@@ -239,24 +317,55 @@ app.get("/stream/:id", async (req, res) => {
     }
 });
 
-async function getMediaFolderPath(itemId) {
-    console.log(`[SUBTITLE] getMediaFolderPath called with: ${itemId}`);
+async function getMediaFolderPath(itemId, requestedFile = null) {
+    console.log(`[SUBTITLE] getMediaFolderPath called with: ${itemId}, file=${requestedFile}`);
     const copyDB = await loadContentWithPaths();
     const item = copyDB.find((i) => i.id === itemId);
-    if (!item || !item.filePath) {
+    if (!item || !item.mediaFiles) {
         console.log(`[SUBTITLE] Item not found in DB: ${itemId}`);
         return null;
     }
-    const folderPath = path.join(MEDIA_PATH, path.basename(item.filePath));
+    
+    let folderPath;
+    if (requestedFile) {
+        const cleanPath = normalizeMediaPath(requestedFile);
+        folderPath = path.join(MEDIA_PATH, cleanPath);
+        folderPath = path.dirname(folderPath);
+        console.log(`[SUBTITLE] Using file path: ${MEDIA_PATH} + ${cleanPath} -> ${folderPath}`);
+    } else {
+        folderPath = path.join(MEDIA_PATH, item.mediaFiles.folderPath);
+        console.log(`[SUBTITLE] Using folderPath: ${folderPath}`);
+    }
+    
     console.log(`[SUBTITLE] Media folder: ${folderPath}`);
     return folderPath;
 }
 
-async function getSubtitleCachePath(itemId, lang) {
-    console.log(`[SUBTITLE] getSubtitleCachePath called: ${itemId}, ${lang}`);
-    const folderPath = await getMediaFolderPath(itemId);
+function getEpisodeIdFromPath(filePath) {
+    if (!filePath) return null;
+    const fileName = filePath.split("/").pop() || "";
+    const match = fileName.match(/[Ss](\d{1,2})[Ee](\d{1,2})/);
+    if (match) {
+        return `S${match[1].padStart(2, '0')}E${match[2].padStart(2, '0')}`;
+    }
+    return null;
+}
+
+async function getSubtitleCachePath(itemId, lang, requestedFile = null) {
+    console.log(`[SUBTITLE] getSubtitleCachePath called: ${itemId}, ${lang}, file=${requestedFile}`);
+    const folderPath = await getMediaFolderPath(itemId, requestedFile);
     if (!folderPath) return null;
-    const vttPath = path.join(folderPath, "subs", `${lang}.vtt`);
+    
+    const episodeId = getEpisodeIdFromPath(requestedFile);
+    let vttFileName;
+    
+    if (episodeId) {
+        vttFileName = `${episodeId}_${lang}.vtt`;
+    } else {
+        vttFileName = `${lang}.vtt`;
+    }
+    
+    const vttPath = path.join(folderPath, "subs", vttFileName);
     console.log(`[SUBTITLE] VTT path: ${vttPath}`);
     return vttPath;
 }
@@ -365,12 +474,13 @@ app.get("/api/subtitles/:id", async (req, res) => {
     try {
         const { id } = req.params;
         const lang = req.query.lang || "en";
-        console.log(`[SUBTITLE] /api/subtitles/${id}?lang=${lang}`);
+        const requestedFile = req.query.file || null;
+        console.log(`[SUBTITLE] /api/subtitles/${id}?lang=${lang}&file=${requestedFile}`);
 
         res.setHeader("Access-Control-Allow-Origin", "*");
         res.setHeader("Content-Type", "text/vtt");
 
-        const vttPath = await getSubtitleCachePath(id, lang);
+        const vttPath = await getSubtitleCachePath(id, lang, requestedFile);
         if (!vttPath) {
             console.log(`[SUBTITLE] Media not found`);
             return res.status(404).json({ error: "Media not found" });
@@ -404,12 +514,13 @@ app.get("/api/subtitles/:id", async (req, res) => {
 app.get("/api/subtitles-available/:id", async (req, res) => {
     try {
         const { id } = req.params;
-        console.log(`[SUBTITLE] /api/subtitles-available/${id}`);
+        const requestedFile = req.query.file || null;
+        console.log(`[SUBTITLE] /api/subtitles-available/${id}?file=${requestedFile}`);
         const langs = ["en", "fr"];
         const available = [];
 
         for (const lang of langs) {
-            const vttPath = await getSubtitleCachePath(id, lang);
+            const vttPath = await getSubtitleCachePath(id, lang, requestedFile);
             
             if (vttPath) {
                 try {

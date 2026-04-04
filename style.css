@@ -620,3 +620,74 @@ a {
 .track-group input[type="radio"] {
     accent-color: #e50914;
 }
+
+.season-selector {
+    margin: 0 6rem 1rem;
+}
+
+.season-buttons {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    margin-bottom: 1rem;
+}
+
+.season-buttons button {
+    background: #333;
+    color: #ccc;
+    border: 1px solid #444;
+    padding: 0.5rem 1rem;
+    border-radius: 0.25rem;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: background 0.2s, color 0.2s;
+}
+
+.season-buttons button:hover {
+    background: #444;
+    color: #fff;
+}
+
+.season-buttons button.active {
+    background: #e50914;
+    border-color: #e50914;
+    color: #fff;
+}
+
+.episode-list {
+    background: #222;
+    border: 1px solid #333;
+    border-radius: 0.5rem;
+    padding: 1rem;
+}
+
+.episode-list h4 {
+    margin: 0 0 0.75rem;
+    color: #e50914;
+    font-size: 0.95rem;
+}
+
+.episode-list button {
+    display: inline-block;
+    background: #333;
+    color: #ccc;
+    border: 1px solid #444;
+    padding: 0.5rem 1rem;
+    border-radius: 0.25rem;
+    cursor: pointer;
+    font-size: 0.9rem;
+    margin: 0.25rem;
+    min-width: 100px;
+    transition: background 0.2s, color 0.2s;
+}
+
+.episode-list button:hover {
+    background: #444;
+    color: #fff;
+}
+
+.episode-list button.active {
+    background: #e50914;
+    border-color: #e50914;
+    color: #fff;
+}
