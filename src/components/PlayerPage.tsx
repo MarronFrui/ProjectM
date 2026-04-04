@@ -63,7 +63,9 @@ export default function PlayerPage() {
                         if (sub.lang === "en" || sub.lang === "fr") {
                             subs.push({
                                 lang: sub.lang,
-                                label: LANG_LABELS[sub.lang] || sub.lang.toUpperCase(),
+                                label:
+                                    LANG_LABELS[sub.lang] ||
+                                    sub.lang.toUpperCase(),
                                 src: `${API_BASE}/api/subtitles/${id}?lang=${sub.lang}`,
                             });
                         }
@@ -78,8 +80,6 @@ export default function PlayerPage() {
         if (item) requestAnimationFrame(focusFirst);
     }, [item]);
 
-
-
     useLayoutEffect(() => {
         if (!item || !videoRef.current) return;
 
@@ -87,6 +87,10 @@ export default function PlayerPage() {
 
         const handleCanPlay = () => {
             playerRef.current = new Plyr(video, {
+                captions: { active: false, update: true },
+                // storage: { enabled: false },
+                keyboard: { focused: true, global: false },
+                ratio: "16:9",
                 controls: [
                     "play-large",
                     "play",
@@ -98,17 +102,18 @@ export default function PlayerPage() {
                     "settings",
                     "fullscreen",
                 ],
-                caption: { update: true},
-                storage: { enabled: false},
-                keyboard: { focused: true, global: false },
-                ratio: "16:9",
             });
 
-            console.log("[PLYR] Initialized");
+            const player = playerRef.current;
+            (window as any).player = player;
+            console.log("Player initialized:", player);
+            console.log("Captions config:", (player as any).captions);
             console.log("[PLYR] Text tracks:", video.textTracks.length);
             for (let i = 0; i < video.textTracks.length; i++) {
                 const t = video.textTracks[i];
-                console.log(`  Track ${i}: kind=${t.kind}, label=${t.label}, lang=${t.language}, mode=${t.mode}`);
+                console.log(
+                    `  Track ${i}: kind=${t.kind}, label=${t.label}, lang=${t.language}, mode=${t.mode}`,
+                );
             }
         };
 
@@ -121,9 +126,11 @@ export default function PlayerPage() {
             }
             video.removeEventListener("canplay", handleCanPlay);
         };
-    }, [item]);
+    }, [item, selectedAudio]);
 
     if (!item) return <div>Loading...</div>;
+
+    const containerKey = `${id}-${selectedAudio}`;
 
     const streamUrl = `${API_BASE}/stream/${id}?audio=${selectedAudio}`;
 
@@ -154,8 +161,15 @@ export default function PlayerPage() {
                                             type="radio"
                                             name="audio"
                                             value={t.track}
-                                            checked={selectedAudio === String(t.track)}
-                                            onChange={() => setSelectedAudio(String(t.track))}
+                                            checked={
+                                                selectedAudio ===
+                                                String(t.track)
+                                            }
+                                            onChange={() =>
+                                                setSelectedAudio(
+                                                    String(t.track),
+                                                )
+                                            }
                                         />
                                         {t.title} ({t.language})
                                     </label>
@@ -167,12 +181,8 @@ export default function PlayerPage() {
             )}
 
             {item.available ? (
-                <div className="videoplayer-container">
-                    <video
-                        ref={videoRef}
-                        className="videoplayer"
-                        autoPlay
-                    >
+                <div className="videoplayer-container" key={containerKey}>
+                    <video ref={videoRef} className="videoplayer" autoPlay>
                         <source src={streamUrl} type="video/mp4" />
                         {externalSubs.map((sub) => (
                             <track

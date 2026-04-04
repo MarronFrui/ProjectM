@@ -384,6 +384,7 @@ a {
 
 .videoplayer-container {
     display: flex;
+    width: 60%;
     justify-content: center;
     align-items: center;
     margin: 2rem 6rem;
