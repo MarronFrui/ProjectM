@@ -268,7 +268,6 @@ async function getVideoPath(itemId, requestedFile = null) {
 
 async function getTrackInfo(itemId, requestedFile = null) {
     const videoPath = await getVideoPath(itemId, requestedFile);
-    if (!videoPath) return null && console.log("!vid");
 
     return new Promise((resolve) => {
         const ffprobe = spawn("ffprobe", [
@@ -315,38 +314,6 @@ app.get("/api/tracks/:id", async (req, res) => {
         res.status(500).json({ error: "Failed to get tracks" });
     }
 });
-
-// Transcoding (no seeking)
-// app.get("/stream/:id", async (req, res) => {
-//     try {
-//         const requestedFile = req.query.file || null;
-//         const videoPath = await getVideoPath(req.params.id, requestedFile);
-//         if (!videoPath) return res.status(404).send("File not found");
-
-//         const audioTrack = req.query.audio ?? "0";
-//         const subtitleTrack = req.query.subtitle ?? "-1";
-
-//         const args = [
-//             "-i", videoPath,
-//             "-map", "0:v",
-//             "-map", `0:a:${audioTrack}`,
-//             "-c:v", "copy",
-//             "-c:a", "aac"
-//         ];
-
-//         if (subtitleTrack !== "-1") {
-//             args.push("-map", `0:s:${subtitleTrack}`, "-c:s", "copy");
-//         } else {
-//             args.push("-map", "-0:s");
-//         }
-
-//         args.push(
-//             "-f", "mp4",
-//             "-movflags", "frag_keyframe+empty_moov",
-//             "pipe:1"
-//         );
-
-//no transcoding
 
 app.get("/stream/:id", async (req, res) => {
     try {
@@ -396,8 +363,8 @@ function getEpisodeIdFromPath(filePath) {
 
 async function getSubtitleCachePath(itemId, lang, requestedFile = null) {
     console.log(`[SUBTITLE] getSubtitleCachePath called: ${itemId}, ${lang}, file=${requestedFile}`);
-    const folderPath = await getMediaFolderPath(itemId, requestedFile);
-    if (!folderPath) return null;
+    
+    if (!requestedFile) return null;
     
     const episodeId = getEpisodeIdFromPath(requestedFile);
     let vttFileName;
@@ -408,7 +375,11 @@ async function getSubtitleCachePath(itemId, lang, requestedFile = null) {
         vttFileName = `${lang}.vtt`;
     }
     
-    const vttPath = path.join(folderPath, "subs", vttFileName);
+    const fileName = requestedFile.split("/").pop() || "";
+    const withoutFile = requestedFile.replace(fileName, "");
+    const subsFolder = path.join(withoutFile, "subs");
+    const vttPath = path.join(MEDIA_PATH, subsFolder, vttFileName);
+    
     console.log(`[SUBTITLE] VTT path: ${vttPath}`);
     return vttPath;
 }
@@ -516,11 +487,26 @@ async function fetchSubtitleFromOpenSubtitles(searchQuery, episode, lang) {
 }
 
 function srtToVtt(srtContent) {
-    const lines = srtContent.split("\n");
     const vttLines = ["WEBVTT", ""];
     
-    for (const line of lines) {
-        vttLines.push(line);
+    const blocks = srtContent.trim().split(/\n\s*\n/);
+    
+    for (const block of blocks) {
+        const lines = block.split(/\r?\n/).filter(line => line.length > 0);
+        
+        if (lines.length < 2) continue;
+        
+        const timestampLine = lines.find(line => /-->/.test(line));
+        if (!timestampLine) continue;
+        
+        const timestampIndex = lines.indexOf(timestampLine);
+        const subtitleLines = lines.slice(timestampIndex + 1);
+        
+        const vttTimestamp = timestampLine.replace(/,/g, ".");
+        
+        vttLines.push(vttTimestamp);
+        vttLines.push(...subtitleLines);
+        vttLines.push("");
     }
     
     return vttLines.join("\n");
