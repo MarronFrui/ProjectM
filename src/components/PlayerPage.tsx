@@ -168,6 +168,7 @@ export default function PlayerPage() {
             const player = new Plyr(video, {
                 captions: { active: false, update: true },
                 keyboard: { focused: true, global: false },
+                storage: { enabled: false },
                 ratio: "16:9",
                 controls: [
                     "play-large",

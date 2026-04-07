@@ -13,7 +13,10 @@ const MEDIA_PATH = "/mnt/media";
 const DB_PATH = path.resolve(__dirname, "../content-info/contentDB.json");
 
 const envPath = path.resolve(__dirname, "../.env");
+const tmdbApiKeyPath = path.resolve(__dirname, "../apikey.json");
 let OPENSUBTITLES_API_KEY = "";
+let TMDB_API_KEY = "";
+
 try {
     const envContent = await fs.readFile(envPath, "utf-8");
     for (const line of envContent.split("\n")) {
@@ -28,8 +31,54 @@ try {
     console.warn("Could not read .env file:", e.message);
 }
 
+try {
+    const apiKeyContent = await fs.readFile(tmdbApiKeyPath, "utf-8");
+    const apiKeyData = JSON.parse(apiKeyContent);
+    TMDB_API_KEY = apiKeyData.API_KEY;
+} catch (e) {
+    console.warn("Could not read TMDB API key:", e.message);
+}
+
 console.log("Resolved DB path:", DB_PATH);
 console.log("OpenSubtitles API Key loaded:", OPENSUBTITLES_API_KEY ? "Yes" : "No");
+console.log("TMDB API Key loaded:", TMDB_API_KEY ? "Yes" : "No");
+
+const episodeNameCache = new Map();
+const EPISODE_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+
+async function getEpisodeName(tmdbId, season, episode) {
+    const cacheKey = `${tmdbId}-${season}-${episode}`;
+    
+    const cached = episodeNameCache.get(cacheKey);
+    if (cached && (Date.now() - cached.timestamp) < EPISODE_CACHE_TTL_MS) {
+        console.log(`[SUBTITLE] Episode name cache hit: ${cacheKey} = ${cached.name}`);
+        return cached.name;
+    }
+    
+    if (!TMDB_API_KEY) {
+        throw new Error("TMDB API key not found");
+    }
+    
+    const url = `https://api.themoviedb.org/3/tv/${tmdbId}/season/${season}/episode/${episode}?api_key=${TMDB_API_KEY}`;
+    
+    const response = await fetch(url);
+    
+    if (!response.ok) {
+        throw new Error(`TMDB API error: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    const episodeName = data.name;
+    
+    if (!episodeName) {
+        throw new Error(`No episode name found for S${season}E${episode}`);
+    }
+    
+    episodeNameCache.set(cacheKey, { name: episodeName, timestamp: Date.now() });
+    console.log(`[SUBTITLE] Cached episode name: ${cacheKey} = ${episodeName}`);
+    
+    return episodeName;
+}
 
 function normalize(str) {
     return str
@@ -267,50 +316,46 @@ app.get("/api/tracks/:id", async (req, res) => {
     }
 });
 
+// Transcoding (no seeking)
+// app.get("/stream/:id", async (req, res) => {
+//     try {
+//         const requestedFile = req.query.file || null;
+//         const videoPath = await getVideoPath(req.params.id, requestedFile);
+//         if (!videoPath) return res.status(404).send("File not found");
+
+//         const audioTrack = req.query.audio ?? "0";
+//         const subtitleTrack = req.query.subtitle ?? "-1";
+
+//         const args = [
+//             "-i", videoPath,
+//             "-map", "0:v",
+//             "-map", `0:a:${audioTrack}`,
+//             "-c:v", "copy",
+//             "-c:a", "aac"
+//         ];
+
+//         if (subtitleTrack !== "-1") {
+//             args.push("-map", `0:s:${subtitleTrack}`, "-c:s", "copy");
+//         } else {
+//             args.push("-map", "-0:s");
+//         }
+
+//         args.push(
+//             "-f", "mp4",
+//             "-movflags", "frag_keyframe+empty_moov",
+//             "pipe:1"
+//         );
+
+//no transcoding
+
 app.get("/stream/:id", async (req, res) => {
     try {
-        const requestedFile = req.query.file || null;
-        const videoPath = await getVideoPath(req.params.id, requestedFile);
+        const videoPath = await getVideoPath(req.params.id, req.query.file);
         if (!videoPath) return res.status(404).send("File not found");
-
-        const audioTrack = req.query.audio ?? "0";
-        const subtitleTrack = req.query.subtitle ?? "-1";
-
-        const args = [
-            "-i", videoPath,
-            "-map", "0:v",
-            "-map", `0:a:${audioTrack}`,
-            "-c:v", "copy",
-            "-c:a", "aac"
-        ];
-
-        if (subtitleTrack !== "-1") {
-            args.push("-map", `0:s:${subtitleTrack}`, "-c:s", "copy");
-        } else {
-            args.push("-map", "-0:s");
-        }
-
-        args.push(
-            "-f", "mp4",
-            "-movflags", "frag_keyframe+empty_moov",
-            "pipe:1"
-        );
-
-        const ffmpeg = spawn("ffmpeg", args);
-
-        res.setHeader("Content-Type", "video/mp4");
-        res.setHeader("Transfer-Encoding", "chunked");
-        res.setHeader("Accept-Ranges", "none");
-
-        ffmpeg.stdout.pipe(res);
-        ffmpeg.stderr.on("data", (d) => console.log("ffmpeg:", d.toString()));
-
-        ffmpeg.on("error", (err) => {
-            console.error("ffmpeg error:", err);
-            if (!res.headersSent) res.status(500).send("Transcode error");
-        });
-
-        req.on("close", () => ffmpeg.kill());
+        
+        // Enable range requests for seeking
+        res.setHeader("Accept-Ranges", "bytes");
+        res.sendFile(videoPath);
     } catch (err) {
         console.error(err);
         res.status(500).send("Internal error");
@@ -325,28 +370,26 @@ async function getMediaFolderPath(itemId, requestedFile = null) {
         console.log(`[SUBTITLE] Item not found in DB: ${itemId}`);
         return null;
     }
-    
-    let folderPath;
-    if (requestedFile) {
-        const cleanPath = normalizeMediaPath(requestedFile);
-        folderPath = path.join(MEDIA_PATH, cleanPath);
-        folderPath = path.dirname(folderPath);
-        console.log(`[SUBTITLE] Using file path: ${MEDIA_PATH} + ${cleanPath} -> ${folderPath}`);
-    } else {
-        folderPath = path.join(MEDIA_PATH, item.mediaFiles.folderPath);
-        console.log(`[SUBTITLE] Using folderPath: ${folderPath}`);
-    }
-    
-    console.log(`[SUBTITLE] Media folder: ${folderPath}`);
-    return folderPath;
+    return path.join(MEDIA_PATH, item.mediaFiles.folderPath);
 }
 
-function getEpisodeIdFromPath(filePath) {
+function getSeasonAndEpisode(filePath) {
     if (!filePath) return null;
     const fileName = filePath.split("/").pop() || "";
     const match = fileName.match(/[Ss](\d{1,2})[Ee](\d{1,2})/);
     if (match) {
-        return `S${match[1].padStart(2, '0')}E${match[2].padStart(2, '0')}`;
+        return {
+            season: parseInt(match[1], 10),
+            episode: parseInt(match[2], 10)
+        };
+    }
+    return null;
+}
+
+function getEpisodeIdFromPath(filePath) {
+    const se = getSeasonAndEpisode(filePath);
+    if (se) {
+        return `S${String(se.season).padStart(2, '0')}E${String(se.episode).padStart(2, '0')}`;
     }
     return null;
 }
@@ -370,9 +413,31 @@ async function getSubtitleCachePath(itemId, lang, requestedFile = null) {
     return vttPath;
 }
 
-async function searchSubtitles(tmdbId, lang) {
-    console.log(`[SUBTITLE] searchSubtitles: tmdbId=${tmdbId}, lang=${lang}`);
-    const url = `https://api.opensubtitles.com/api/v1/subtitles?tmdb_id=${tmdbId}&languages=${lang}`;
+function buildSearchQuery(filePath) {
+    const fileName = filePath.split("/").pop() || "";
+    
+    const episodeMatch = fileName.match(/[Ss](\d{1,2})[Ee](\d{1,2})/);
+    if (!episodeMatch) return null;
+    
+    const episode = `S${episodeMatch[1].padStart(2, '0')}E${episodeMatch[2].padStart(2, '0')}`;
+    const season = parseInt(episodeMatch[1], 10);
+    const epNum = parseInt(episodeMatch[2], 10);
+    
+    const beforeEpisode = fileName.substring(0, fileName.indexOf(episodeMatch[0])).replace(/[\.\-_]+$/g).replace(/[\.\-_]/g, " ").trim();
+    
+    return { showName: beforeEpisode, episode, season, epNum };
+}
+
+function buildMovieSearchQuery(filePath) {
+    const fileName = filePath.split("/").pop() || "";
+    const movieName = fileName.replace(/\.(mp4|mkv|avi|mov|webm)$/i, "").replace(/[\.\-_]/g, " ").trim();
+    return movieName;
+}
+
+async function searchSubtitles(searchQuery, episode, lang) {
+    console.log(`[SUBTITLE] searchSubtitles: query="${searchQuery}", episode=${episode}, lang=${lang}`);
+    
+    const url = `https://api.opensubtitles.com/api/v1/subtitles?query=${encodeURIComponent(searchQuery)}&languages=${lang}`;
     console.log(`[SUBTITLE] OpenSubtitles search URL: ${url}`);
 
     const response = await fetch(url, {
@@ -392,20 +457,30 @@ async function searchSubtitles(tmdbId, lang) {
     }
 
     const data = await response.json();
-    console.log(`[SUBTITLE] OpenSubtitles search response:`, JSON.stringify(data, null, 2).substring(0, 1000));
+    console.log(`[SUBTITLE] OpenSubtitles search response:`, JSON.stringify(data, null, 2).substring(0, 3000));
 
     if (!data.data || data.data.length === 0) {
         throw new Error("No subtitles found");
     }
 
-    const firstResult = data.data[0];
-    const fileId = firstResult?.attributes?.files?.[0]?.file_id;
-    
-    if (!fileId) {
-        throw new Error("No file_id in search results");
+    const matchedResults = data.data
+        .map(result => ({
+            fileId: result.attributes.files[0].file_id,
+            fileName: result.attributes.files[0].file_name,
+            downloadCount: result.attributes.download_count || 0
+        }))
+        .filter(result => result.fileName.includes(episode))
+        .sort((a, b) => b.downloadCount - a.downloadCount);
+
+    if (matchedResults.length === 0) {
+        console.log(`[SUBTITLE] No results matching episode ${episode}`);
+        throw new Error("No subtitles found for episode");
     }
 
-    return fileId;
+    const bestMatch = matchedResults[0];
+    console.log(`[SUBTITLE] Selected subtitle: ${bestMatch.fileName} (${bestMatch.downloadCount} downloads)`);
+
+    return bestMatch.fileId;
 }
 
 async function downloadSubtitle(fileId) {
@@ -433,9 +508,9 @@ async function downloadSubtitle(fileId) {
     return data.link;
 }
 
-async function fetchSubtitleFromOpenSubtitles(tmdbId, lang) {
-    console.log(`[SUBTITLE] fetchSubtitleFromOpenSubtitles: tmdbId=${tmdbId}, lang=${lang}`);
-    const fileId = await searchSubtitles(tmdbId, lang);
+async function fetchSubtitleFromOpenSubtitles(searchQuery, episode, lang) {
+    console.log(`[SUBTITLE] fetchSubtitleFromOpenSubtitles: query="${searchQuery}", episode=${episode}, lang=${lang}`);
+    const fileId = await searchSubtitles(searchQuery, episode, lang);
     const downloadLink = await downloadSubtitle(fileId);
     return downloadLink;
 }
@@ -495,9 +570,31 @@ app.get("/api/subtitles/:id", async (req, res) => {
         }
 
         const tmdbId = id.replace(/^(movie|tv)-/, "");
-        console.log(`[SUBTITLE] TMDB ID: ${tmdbId}`);
+        const isTvShow = id.startsWith("tv-");
         
-        const subtitleUrl = await fetchSubtitleFromOpenSubtitles(tmdbId, lang);
+        let searchQuery;
+        let episode = null;
+
+        if (isTvShow) {
+            const searchData = buildSearchQuery(requestedFile);
+            if (!searchData) {
+                console.log(`[SUBTITLE] Could not extract episode info from filename`);
+                return res.status(400).json({ error: "Could not extract episode info from filename" });
+            }
+            
+            console.log(`[SUBTITLE] TV Show detected: ${searchData.showName} ${searchData.episode}`);
+            
+            const episodeName = await getEpisodeName(tmdbId, searchData.season, searchData.epNum);
+            searchQuery = `${searchData.showName} ${searchData.episode} ${episodeName}`;
+            episode = searchData.episode;
+            
+            console.log(`[SUBTITLE] Full search query: "${searchQuery}", Episode: ${episode}`);
+        } else {
+            searchQuery = buildMovieSearchQuery(requestedFile);
+            console.log(`[SUBTITLE] Movie detected, search query: "${searchQuery}"`);
+        }
+        
+        const subtitleUrl = await fetchSubtitleFromOpenSubtitles(searchQuery, episode, lang);
         console.log(`[SUBTITLE] Got subtitle URL: ${subtitleUrl}`);
         
         const savedPath = await downloadAndConvertToVTT(subtitleUrl, vttPath);
@@ -506,8 +603,8 @@ app.get("/api/subtitles/:id", async (req, res) => {
         res.sendFile(savedPath);
 
     } catch (err) {
-        console.error("[SUBTITLE] Error:", err.message);
-        res.status(500).json({ error: "Failed to fetch subtitle" });
+        console.error("[SUBTITLE] Error:", err.message, err.stack);
+        res.status(500).json({ error: "Failed to fetch subtitle: " + err.message });
     }
 });
 
