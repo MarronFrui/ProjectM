@@ -40,7 +40,10 @@ try {
 }
 
 console.log("Resolved DB path:", DB_PATH);
-console.log("OpenSubtitles API Key loaded:", OPENSUBTITLES_API_KEY ? "Yes" : "No");
+console.log(
+    "OpenSubtitles API Key loaded:",
+    OPENSUBTITLES_API_KEY ? "Yes" : "No",
+);
 console.log("TMDB API Key loaded:", TMDB_API_KEY ? "Yes" : "No");
 
 const episodeNameCache = new Map();
@@ -48,35 +51,40 @@ const EPISODE_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
 async function getEpisodeName(tmdbId, season, episode) {
     const cacheKey = `${tmdbId}-${season}-${episode}`;
-    
+
     const cached = episodeNameCache.get(cacheKey);
-    if (cached && (Date.now() - cached.timestamp) < EPISODE_CACHE_TTL_MS) {
-        console.log(`[SUBTITLE] Episode name cache hit: ${cacheKey} = ${cached.name}`);
+    if (cached && Date.now() - cached.timestamp < EPISODE_CACHE_TTL_MS) {
+        console.log(
+            `[SUBTITLE] Episode name cache hit: ${cacheKey} = ${cached.name}`,
+        );
         return cached.name;
     }
-    
+
     if (!TMDB_API_KEY) {
         throw new Error("TMDB API key not found");
     }
-    
+
     const url = `https://api.themoviedb.org/3/tv/${tmdbId}/season/${season}/episode/${episode}?api_key=${TMDB_API_KEY}`;
-    
+
     const response = await fetch(url);
-    
+
     if (!response.ok) {
         throw new Error(`TMDB API error: ${response.status}`);
     }
-    
+
     const data = await response.json();
     const episodeName = data.name;
-    
+
     if (!episodeName) {
         throw new Error(`No episode name found for S${season}E${episode}`);
     }
-    
-    episodeNameCache.set(cacheKey, { name: episodeName, timestamp: Date.now() });
+
+    episodeNameCache.set(cacheKey, {
+        name: episodeName,
+        timestamp: Date.now(),
+    });
     console.log(`[SUBTITLE] Cached episode name: ${cacheKey} = ${episodeName}`);
-    
+
     return episodeName;
 }
 
@@ -110,7 +118,7 @@ async function scanMediaFolder(folderPath, isTvShow) {
     const result = {
         videos: [],
         subtitles: [],
-        folderPath: path.basename(folderPath)
+        folderPath: path.basename(folderPath),
     };
 
     try {
@@ -121,9 +129,13 @@ async function scanMediaFolder(folderPath, isTvShow) {
                 const stat = await fs.stat(fullPath);
                 if (stat.isFile()) {
                     if (/\.(mp4|mkv|avi|mov|webm)$/i.test(file)) {
-                        result.videos.push(`/media/${path.basename(folderPath)}/${file}`);
+                        result.videos.push(
+                            `/media/${path.basename(folderPath)}/${file}`,
+                        );
                     } else if (/\.vtt$/i.test(file)) {
-                        result.subtitles.push(`/media/${path.basename(folderPath)}/${file}`);
+                        result.subtitles.push(
+                            `/media/${path.basename(folderPath)}/${file}`,
+                        );
                     }
                 }
             }
@@ -140,9 +152,13 @@ async function scanMediaFolder(folderPath, isTvShow) {
                         const fileStat = await fs.stat(filePath);
                         if (fileStat.isFile()) {
                             if (/\.(mp4|mkv|avi|mov|webm)$/i.test(file)) {
-                                result.videos.push(`/media/${path.basename(folderPath)}/${entry}/${file}`);
+                                result.videos.push(
+                                    `/media/${path.basename(folderPath)}/${entry}/${file}`,
+                                );
                             } else if (/\.vtt$/i.test(file)) {
-                                result.subtitles.push(`/media/${path.basename(folderPath)}/${entry}/${file}`);
+                                result.subtitles.push(
+                                    `/media/${path.basename(folderPath)}/${entry}/${file}`,
+                                );
                             }
                         }
                     }
@@ -162,27 +178,29 @@ app.get("/api/content-availability", async (req, res) => {
         const contentDB = JSON.parse(raw);
         const files = await fs.readdir(MEDIA_PATH);
 
-        const items = await Promise.all(contentDB.map(async (item) => {
-            const match = files.find((f) => matches(f, item.name));
+        const items = await Promise.all(
+            contentDB.map(async (item) => {
+                const match = files.find((f) => matches(f, item.name));
 
-            if (!match) {
+                if (!match) {
+                    return {
+                        ...item,
+                        available: false,
+                        mediaFiles: null,
+                    };
+                }
+
+                const isTvShow = item.seasons !== null;
+                const folderPath = path.join(MEDIA_PATH, match);
+                const mediaFiles = await scanMediaFolder(folderPath, isTvShow);
+
                 return {
                     ...item,
-                    available: false,
-                    mediaFiles: null,
+                    available: mediaFiles.videos.length > 0,
+                    mediaFiles,
                 };
-            }
-
-            const isTvShow = item.seasons !== null;
-            const folderPath = path.join(MEDIA_PATH, match);
-            const mediaFiles = await scanMediaFolder(folderPath, isTvShow);
-
-            return {
-                ...item,
-                available: mediaFiles.videos.length > 0,
-                mediaFiles,
-            };
-        }));
+            }),
+        );
 
         res.json(items);
     } catch (err) {
@@ -196,23 +214,25 @@ async function loadContentWithPaths() {
     const contentDB = JSON.parse(raw);
     const files = await fs.readdir(MEDIA_PATH);
 
-    const updatedDb = await Promise.all(contentDB.map(async (item) => {
-        const match = files.find((f) => matches(f, item.name));
+    const updatedDb = await Promise.all(
+        contentDB.map(async (item) => {
+            const match = files.find((f) => matches(f, item.name));
 
-        if (!match) {
-            return { ...item, available: false, mediaFiles: null };
-        }
+            if (!match) {
+                return { ...item, available: false, mediaFiles: null };
+            }
 
-        const isTvShow = item.seasons !== null;
-        const folderPath = path.join(MEDIA_PATH, match);
-        const mediaFiles = await scanMediaFolder(folderPath, isTvShow);
+            const isTvShow = item.seasons !== null;
+            const folderPath = path.join(MEDIA_PATH, match);
+            const mediaFiles = await scanMediaFolder(folderPath, isTvShow);
 
-        return {
-            ...item,
-            available: mediaFiles.videos.length > 0,
-            mediaFiles,
-        };
-    }));
+            return {
+                ...item,
+                available: mediaFiles.videos.length > 0,
+                mediaFiles,
+            };
+        }),
+    );
 
     return updatedDb;
 }
@@ -221,10 +241,9 @@ app.get("/media/:id", async (req, res) => {
     try {
         const requestedFile = req.query.file;
         const copyDB = await loadContentWithPaths();
-        const item = copyDB.find(i => i.id === req.params.id);
+        const item = copyDB.find((i) => i.id === req.params.id);
 
-        if (!item)
-            return res.status(404).send("Item not found");
+        if (!item) return res.status(404).send("Item not found");
 
         let fullPath;
         if (requestedFile) {
@@ -271,10 +290,12 @@ async function getTrackInfo(itemId, requestedFile = null) {
 
     return new Promise((resolve) => {
         const ffprobe = spawn("ffprobe", [
-            "-v", "quiet",
-            "-print_format", "json",
+            "-v",
+            "quiet",
+            "-print_format",
+            "json",
             "-show_streams",
-            videoPath
+            videoPath,
         ]);
 
         let data = "";
@@ -291,8 +312,9 @@ async function getTrackInfo(itemId, requestedFile = null) {
                         index: streams.indexOf(s),
                         track: streams.indexOf(s),
                         language: s.tags?.language || "unknown",
-                        title: s.tags?.title || `Audio ${streams.indexOf(s) + 1}`,
-                        codec: s.codec_name
+                        title:
+                            s.tags?.title || `Audio ${streams.indexOf(s) + 1}`,
+                        codec: s.codec_name,
                     }));
 
                 resolve({ audio });
@@ -319,7 +341,7 @@ app.get("/stream/:id", async (req, res) => {
     try {
         const videoPath = await getVideoPath(req.params.id, req.query.file);
         if (!videoPath) return res.status(404).send("File not found");
-        
+
         // Enable range requests for seeking
         res.setHeader("Accept-Ranges", "bytes");
         res.sendFile(videoPath);
@@ -330,7 +352,9 @@ app.get("/stream/:id", async (req, res) => {
 });
 
 async function getMediaFolderPath(itemId, requestedFile = null) {
-    console.log(`[SUBTITLE] getMediaFolderPath called with: ${itemId}, file=${requestedFile}`);
+    console.log(
+        `[SUBTITLE] getMediaFolderPath called with: ${itemId}, file=${requestedFile}`,
+    );
     const copyDB = await loadContentWithPaths();
     const item = copyDB.find((i) => i.id === itemId);
     if (!item || !item.mediaFiles) {
@@ -347,7 +371,7 @@ function getSeasonAndEpisode(filePath) {
     if (match) {
         return {
             season: parseInt(match[1], 10),
-            episode: parseInt(match[2], 10)
+            episode: parseInt(match[2], 10),
         };
     }
     return null;
@@ -356,58 +380,69 @@ function getSeasonAndEpisode(filePath) {
 function getEpisodeIdFromPath(filePath) {
     const se = getSeasonAndEpisode(filePath);
     if (se) {
-        return `S${String(se.season).padStart(2, '0')}E${String(se.episode).padStart(2, '0')}`;
+        return `S${String(se.season).padStart(2, "0")}E${String(se.episode).padStart(2, "0")}`;
     }
     return null;
 }
 
 async function getSubtitleCachePath(itemId, lang, requestedFile = null) {
-    console.log(`[SUBTITLE] getSubtitleCachePath called: ${itemId}, ${lang}, file=${requestedFile}`);
-    
+    console.log(
+        `[SUBTITLE] getSubtitleCachePath called: ${itemId}, ${lang}, file=${requestedFile}`,
+    );
+
     if (!requestedFile) return null;
-    
+
     const episodeId = getEpisodeIdFromPath(requestedFile);
     let vttFileName;
-    
+
     if (episodeId) {
         vttFileName = `${episodeId}_${lang}.vtt`;
     } else {
         vttFileName = `${lang}.vtt`;
     }
-    
+
     const fileName = requestedFile.split("/").pop() || "";
     const withoutFile = requestedFile.replace(fileName, "");
     const subsFolder = path.join(withoutFile, "subs");
     const vttPath = path.join(MEDIA_PATH, subsFolder, vttFileName);
-    
+
     console.log(`[SUBTITLE] VTT path: ${vttPath}`);
     return vttPath;
 }
 
 function buildSearchQuery(filePath) {
     const fileName = filePath.split("/").pop() || "";
-    
+
     const episodeMatch = fileName.match(/[Ss](\d{1,2})[Ee](\d{1,2})/);
     if (!episodeMatch) return null;
-    
-    const episode = `S${episodeMatch[1].padStart(2, '0')}E${episodeMatch[2].padStart(2, '0')}`;
+
+    const episode = `S${episodeMatch[1].padStart(2, "0")}E${episodeMatch[2].padStart(2, "0")}`;
     const season = parseInt(episodeMatch[1], 10);
     const epNum = parseInt(episodeMatch[2], 10);
-    
-    const beforeEpisode = fileName.substring(0, fileName.indexOf(episodeMatch[0])).replace(/[\.\-_]+$/g).replace(/[\.\-_]/g, " ").trim();
-    
+
+    const beforeEpisode = fileName
+        .substring(0, fileName.indexOf(episodeMatch[0]))
+        .replace(/[\.\-_]+$/g)
+        .replace(/[\.\-_]/g, " ")
+        .trim();
+
     return { showName: beforeEpisode, episode, season, epNum };
 }
 
 function buildMovieSearchQuery(filePath) {
     const fileName = filePath.split("/").pop() || "";
-    const movieName = fileName.replace(/\.(mp4|mkv|avi|mov|webm)$/i, "").replace(/[\.\-_]/g, " ").trim();
+    const movieName = fileName
+        .replace(/\.(mp4|mkv|avi|mov|webm)$/i, "")
+        .replace(/[\.\-_]/g, " ")
+        .trim();
     return movieName;
 }
 
 async function searchSubtitles(searchQuery, episode, lang) {
-    console.log(`[SUBTITLE] searchSubtitles: query="${searchQuery}", episode=${episode}, lang=${lang}`);
-    
+    console.log(
+        `[SUBTITLE] searchSubtitles: query="${searchQuery}", episode=${episode}, lang=${lang}`,
+    );
+
     const url = `https://api.opensubtitles.com/api/v1/subtitles?query=${encodeURIComponent(searchQuery)}&languages=${lang}`;
     console.log(`[SUBTITLE] OpenSubtitles search URL: ${url}`);
 
@@ -415,8 +450,8 @@ async function searchSubtitles(searchQuery, episode, lang) {
         headers: {
             "Api-Key": OPENSUBTITLES_API_KEY,
             "User-Agent": "ProjectM v1.0",
-            "Accept": "application/json"
-        }
+            Accept: "application/json",
+        },
     });
 
     console.log(`[SUBTITLE] OpenSubtitles search status: ${response.status}`);
@@ -428,20 +463,26 @@ async function searchSubtitles(searchQuery, episode, lang) {
     }
 
     const data = await response.json();
-    console.log(`[SUBTITLE] OpenSubtitles search response:`, JSON.stringify(data, null, 2).substring(0, 3000));
+    console.log(
+        `[SUBTITLE] OpenSubtitles search response:`,
+        JSON.stringify(data, null, 2).substring(0, 3000),
+    );
 
     if (!data.data || data.data.length === 0) {
         throw new Error("No subtitles found");
     }
 
     const matchedResults = data.data
-        .map(result => ({
+        .map((result) => ({
             fileId: result.attributes.files[0].file_id,
             fileName: result.attributes.files[0].file_name,
-            downloadCount: result.attributes.download_count || 0
+            downloadCount: result.attributes.download_count || 0,
         }))
-        .filter(result => result.fileName.includes(episode))
-        .sort((a, b) => b.downloadCount - a.downloadCount);
+        .filter(
+            (result) =>
+                result.fileName.includes(showName) &&
+                result.fileName.includes(episode),
+        );
 
     if (matchedResults.length === 0) {
         console.log(`[SUBTITLE] No results matching episode ${episode}`);
@@ -449,23 +490,28 @@ async function searchSubtitles(searchQuery, episode, lang) {
     }
 
     const bestMatch = matchedResults[0];
-    console.log(`[SUBTITLE] Selected subtitle: ${bestMatch.fileName} (${bestMatch.downloadCount} downloads)`);
+    console.log(
+        `[SUBTITLE] Selected subtitle: ${bestMatch.fileName} (${bestMatch.downloadCount} downloads)`,
+    );
 
     return bestMatch.fileId;
 }
 
 async function downloadSubtitle(fileId) {
     console.log(`[SUBTITLE] downloadSubtitle: fileId=${fileId}`);
-    const response = await fetch("https://api.opensubtitles.com/api/v1/download", {
-        method: "POST",
-        headers: {
-            "Api-Key": OPENSUBTITLES_API_KEY,
-            "User-Agent": "ProjectM v1.0",
-            "Content-Type": "application/json",
-            "Accept": "application/json"
+    const response = await fetch(
+        "https://api.opensubtitles.com/api/v1/download",
+        {
+            method: "POST",
+            headers: {
+                "Api-Key": OPENSUBTITLES_API_KEY,
+                "User-Agent": "ProjectM v1.0",
+                "Content-Type": "application/json",
+                Accept: "application/json",
+            },
+            body: JSON.stringify({ file_id: fileId }),
         },
-        body: JSON.stringify({ file_id: fileId })
-    });
+    );
 
     console.log(`[SUBTITLE] OpenSubtitles download status: ${response.status}`);
 
@@ -480,7 +526,9 @@ async function downloadSubtitle(fileId) {
 }
 
 async function fetchSubtitleFromOpenSubtitles(searchQuery, episode, lang) {
-    console.log(`[SUBTITLE] fetchSubtitleFromOpenSubtitles: query="${searchQuery}", episode=${episode}, lang=${lang}`);
+    console.log(
+        `[SUBTITLE] fetchSubtitleFromOpenSubtitles: query="${searchQuery}", episode=${episode}, lang=${lang}`,
+    );
     const fileId = await searchSubtitles(searchQuery, episode, lang);
     const downloadLink = await downloadSubtitle(fileId);
     return downloadLink;
@@ -488,32 +536,34 @@ async function fetchSubtitleFromOpenSubtitles(searchQuery, episode, lang) {
 
 function srtToVtt(srtContent) {
     const vttLines = ["WEBVTT", ""];
-    
+
     const blocks = srtContent.trim().split(/\n\s*\n/);
-    
+
     for (const block of blocks) {
-        const lines = block.split(/\r?\n/).filter(line => line.length > 0);
-        
+        const lines = block.split(/\r?\n/).filter((line) => line.length > 0);
+
         if (lines.length < 2) continue;
-        
-        const timestampLine = lines.find(line => /-->/.test(line));
+
+        const timestampLine = lines.find((line) => /-->/.test(line));
         if (!timestampLine) continue;
-        
+
         const timestampIndex = lines.indexOf(timestampLine);
         const subtitleLines = lines.slice(timestampIndex + 1);
-        
+
         const vttTimestamp = timestampLine.replace(/,/g, ".");
-        
+
         vttLines.push(vttTimestamp);
         vttLines.push(...subtitleLines);
         vttLines.push("");
     }
-    
+
     return vttLines.join("\n");
 }
 
 async function downloadAndConvertToVTT(subtitleUrl, vttPath) {
-    console.log(`[SUBTITLE] downloadAndConvertToVTT: ${subtitleUrl} -> ${vttPath}`);
+    console.log(
+        `[SUBTITLE] downloadAndConvertToVTT: ${subtitleUrl} -> ${vttPath}`,
+    );
     const subsDir = path.dirname(vttPath);
     await fs.mkdir(subsDir, { recursive: true });
 
@@ -523,7 +573,7 @@ async function downloadAndConvertToVTT(subtitleUrl, vttPath) {
     }
 
     const srtContent = await response.text();
-    
+
     const vttContent = srtToVtt(srtContent);
     await fs.writeFile(vttPath, vttContent);
     console.log(`[SUBTITLE] VTT created: ${vttPath}`);
@@ -536,7 +586,9 @@ app.get("/api/subtitles/:id", async (req, res) => {
         const { id } = req.params;
         const lang = req.query.lang || "en";
         const requestedFile = req.query.file || null;
-        console.log(`[SUBTITLE] /api/subtitles/${id}?lang=${lang}&file=${requestedFile}`);
+        console.log(
+            `[SUBTITLE] /api/subtitles/${id}?lang=${lang}&file=${requestedFile}`,
+        );
 
         res.setHeader("Access-Control-Allow-Origin", "*");
         res.setHeader("Content-Type", "text/vtt");
@@ -552,45 +604,68 @@ app.get("/api/subtitles/:id", async (req, res) => {
             console.log(`[SUBTITLE] Returning cached VTT: ${vttPath}`);
             return res.sendFile(vttPath);
         } catch {
-            console.log(`[SUBTITLE] VTT not cached, fetching from OpenSubtitles...`);
+            console.log(
+                `[SUBTITLE] VTT not cached, fetching from OpenSubtitles...`,
+            );
         }
 
         const tmdbId = id.replace(/^(movie|tv)-/, "");
         const isTvShow = id.startsWith("tv-");
-        
+
         let searchQuery;
         let episode = null;
 
         if (isTvShow) {
             const searchData = buildSearchQuery(requestedFile);
             if (!searchData) {
-                console.log(`[SUBTITLE] Could not extract episode info from filename`);
-                return res.status(400).json({ error: "Could not extract episode info from filename" });
+                console.log(
+                    `[SUBTITLE] Could not extract episode info from filename`,
+                );
+                return res
+                    .status(400)
+                    .json({
+                        error: "Could not extract episode info from filename",
+                    });
             }
-            
-            console.log(`[SUBTITLE] TV Show detected: ${searchData.showName} ${searchData.episode}`);
-            
-            const episodeName = await getEpisodeName(tmdbId, searchData.season, searchData.epNum);
+
+            console.log(
+                `[SUBTITLE] TV Show detected: ${searchData.showName} ${searchData.episode}`,
+            );
+
+            const episodeName = await getEpisodeName(
+                tmdbId,
+                searchData.season,
+                searchData.epNum,
+            );
             searchQuery = `${searchData.showName} ${searchData.episode} ${episodeName}`;
             episode = searchData.episode;
-            
-            console.log(`[SUBTITLE] Full search query: "${searchQuery}", Episode: ${episode}`);
+
+            console.log(
+                `[SUBTITLE] Full search query: "${searchQuery}", Episode: ${episode}`,
+            );
         } else {
             searchQuery = buildMovieSearchQuery(requestedFile);
-            console.log(`[SUBTITLE] Movie detected, search query: "${searchQuery}"`);
+            console.log(
+                `[SUBTITLE] Movie detected, search query: "${searchQuery}"`,
+            );
         }
-        
-        const subtitleUrl = await fetchSubtitleFromOpenSubtitles(searchQuery, episode, lang);
+
+        const subtitleUrl = await fetchSubtitleFromOpenSubtitles(
+            searchQuery,
+            episode,
+            lang,
+        );
         console.log(`[SUBTITLE] Got subtitle URL: ${subtitleUrl}`);
-        
+
         const savedPath = await downloadAndConvertToVTT(subtitleUrl, vttPath);
         console.log(`[SUBTITLE] Saved and returning: ${savedPath}`);
-        
-        res.sendFile(savedPath);
 
+        res.sendFile(savedPath);
     } catch (err) {
         console.error("[SUBTITLE] Error:", err.message, err.stack);
-        res.status(500).json({ error: "Failed to fetch subtitle: " + err.message });
+        res.status(500).json({
+            error: "Failed to fetch subtitle: " + err.message,
+        });
     }
 });
 
@@ -598,17 +673,21 @@ app.get("/api/subtitles-available/:id", async (req, res) => {
     try {
         const { id } = req.params;
         const requestedFile = req.query.file || null;
-        console.log(`[SUBTITLE] /api/subtitles-available/${id}?file=${requestedFile}`);
+        console.log(
+            `[SUBTITLE] /api/subtitles-available/${id}?file=${requestedFile}`,
+        );
         const langs = ["en", "fr"];
         const available = [];
 
         for (const lang of langs) {
             const vttPath = await getSubtitleCachePath(id, lang, requestedFile);
-            
+
             if (vttPath) {
                 try {
                     await fs.access(vttPath);
-                    console.log(`[SUBTITLE] Found cached VTT for ${lang}: ${vttPath}`);
+                    console.log(
+                        `[SUBTITLE] Found cached VTT for ${lang}: ${vttPath}`,
+                    );
                     available.push({ lang, cached: true });
                 } catch {
                     console.log(`[SUBTITLE] No subtitle for ${lang}`);
