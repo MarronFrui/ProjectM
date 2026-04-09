@@ -384,10 +384,11 @@ a {
 
 .videoplayer-container {
     display: flex;
-    width: 60%;
+    width: 80%;
+    max-width: 1200px;
     justify-content: center;
     align-items: center;
-    margin: 2rem 6rem;
+    margin: 2rem auto;
     min-height: 50vh; 
 }
 

@@ -1,6 +1,7 @@
 import express from "express";
 import cors from "cors";
 import fs from "fs/promises";
+import fsSync from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import { spawn } from "child_process";
@@ -342,9 +343,30 @@ app.get("/stream/:id", async (req, res) => {
         const videoPath = await getVideoPath(req.params.id, req.query.file);
         if (!videoPath) return res.status(404).send("File not found");
 
-        // Enable range requests for seeking
-        res.setHeader("Accept-Ranges", "bytes");
-        res.sendFile(videoPath);
+        const stat = await fs.stat(videoPath);
+        const fileSize = stat.size;
+        const range = req.headers.range;
+
+        if (range) {
+            const parts = range.replace(/bytes=/, "").split("-");
+            const start = parseInt(parts[0], 10);
+            const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
+            const chunkSize = end - start + 1;
+
+            res.status(206);
+            res.setHeader("Content-Range", `bytes ${start}-${end}/${fileSize}`);
+            res.setHeader("Accept-Ranges", "bytes");
+            res.setHeader("Content-Length", chunkSize);
+            res.setHeader("Content-Type", "video/mp4");
+
+            const stream = fsSync.createReadStream(videoPath, { start, end });
+            stream.pipe(res);
+        } else {
+            res.setHeader("Accept-Ranges", "bytes");
+            res.setHeader("Content-Length", fileSize);
+            res.setHeader("Content-Type", "video/mp4");
+            res.sendFile(videoPath);
+        }
     } catch (err) {
         console.error(err);
         res.status(500).send("Internal error");

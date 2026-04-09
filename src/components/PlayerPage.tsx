@@ -161,30 +161,28 @@ export default function PlayerPage() {
         const video = videoRef.current;
 
         const handleCanPlay = () => {
-            if (playerRef.current) {
-                playerRef.current.destroy();
+            if (!playerRef.current) {
+                const player = new Plyr(video, {
+                    captions: { active: false, update: true },
+                    keyboard: { focused: true, global: false },
+                    storage: { enabled: false },
+                    ratio: "16:9",
+                    controls: [
+                        "play-large",
+                        "play",
+                        "progress",
+                        "current-time",
+                        "mute",
+                        "volume",
+                        "captions",
+                        "settings",
+                        "fullscreen",
+                    ],
+                });
+
+                playerRef.current = player;
+                console.log("[PLYR] Initialized");
             }
-
-            const player = new Plyr(video, {
-                captions: { active: false, update: true },
-                keyboard: { focused: true, global: false },
-                storage: { enabled: false },
-                ratio: "16:9",
-                controls: [
-                    "play-large",
-                    "play",
-                    "progress",
-                    "current-time",
-                    "mute",
-                    "volume",
-                    "captions",
-                    "settings",
-                    "fullscreen",
-                ],
-            });
-
-            playerRef.current = player;
-            console.log("[PLYR] Initialized");
         };
 
         video.addEventListener("canplay", handleCanPlay);
@@ -201,7 +199,7 @@ export default function PlayerPage() {
     if (!item) return <div>Loading...</div>;
 
     const fileParam = selectedVideo ? encodeURIComponent(selectedVideo) : "";
-    const containerKey = `${id}-${selectedVideo}-${selectedAudio}`;
+    const containerKey = `${id}-${selectedVideo}`;
     const streamUrl = `${API_BASE}/stream/${id}?audio=${selectedAudio}${selectedVideo ? `&file=${fileParam}` : ""}`;
 
     const currentSeason = seasons.find((s) => s.season === selectedSeason);
