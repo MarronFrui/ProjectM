@@ -476,6 +476,8 @@ async function searchSubtitles(searchQuery, showName, episode, lang) {
             downloadCount: result.attributes.download_count || 0,
         }))
         .filter((result) => {
+            if (!showName) return false;
+
             const normalizedShowName = showName
                 .toLowerCase()
                 .replace(/\./g, " ");
@@ -485,20 +487,22 @@ async function searchSubtitles(searchQuery, showName, episode, lang) {
             // Check show name (with dots replaced by spaces)
             const showMatch = normalizedFileName.includes(normalizedShowName);
 
-            // Check episode - flexible matching
-            // Current: S01E01, should also match s01e01, 1x01, etc.
-            const episodeMatch =
-                normalizedFileName.includes(normalizedEpisode) ||
-                normalizedFileName.includes(
-                    normalizedEpisode.replace(/S(\d+)E(\d+)/i, "$1x$2"),
-                );
+            // Only check episode matching for TV shows (non-empty episode)
+            let episodeMatch = true;
+            if (normalizedEpisode) {
+                episodeMatch =
+                    normalizedFileName.includes(normalizedEpisode) ||
+                    normalizedFileName.includes(
+                        normalizedEpisode.replace(/S(\d+)E(\d+)/i, "$1x$2"),
+                    );
+            }
 
             return showMatch && episodeMatch;
         });
 
     if (matchedResults.length === 0) {
-        console.log(`[SUBTITLE] No results matching episode ${episode}`);
-        throw new Error("No subtitles found for episode");
+        console.log(`[SUBTITLE] No subtitles found for: ${showName}`);
+        throw new Error("No subtitles found");
     }
 
     const bestMatch = matchedResults[0];
@@ -630,8 +634,8 @@ app.get("/api/subtitles/:id", async (req, res) => {
         const isTvShow = id.startsWith("tv-");
 
         let searchQuery;
-        let episode = null;
-        let showName = null;
+        let episode = "";
+        let showName = "";
 
         if (isTvShow) {
             const searchData = buildSearchQuery(requestedFile);
@@ -662,8 +666,10 @@ app.get("/api/subtitles/:id", async (req, res) => {
             );
         } else {
             searchQuery = buildMovieSearchQuery(requestedFile);
+            const pathParts = requestedFile.split("/");
+            showName = pathParts[pathParts.length - 2] || searchQuery;
             console.log(
-                `[SUBTITLE] Movie detected, search query: "${searchQuery}"`,
+                `[SUBTITLE] Movie detected, search query: "${searchQuery}", showName: "${showName}"`,
             );
         }
 
