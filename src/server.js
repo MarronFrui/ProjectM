@@ -412,6 +412,9 @@ async function getSubtitleCachePath(itemId, lang, requestedFile = null) {
 
 function buildSearchQuery(filePath) {
     const fileName = filePath.split("/").pop() || "";
+    const parts = filePath.split("/");
+
+    const showName = parts[2] || "";
 
     const episodeMatch = fileName.match(/[Ss](\d{1,2})[Ee](\d{1,2})/);
     if (!episodeMatch) return null;
@@ -420,13 +423,7 @@ function buildSearchQuery(filePath) {
     const season = parseInt(episodeMatch[1], 10);
     const epNum = parseInt(episodeMatch[2], 10);
 
-    const beforeEpisode = fileName
-        .substring(0, fileName.indexOf(episodeMatch[0]))
-        .replace(/[\.\-_]+$/g)
-        .replace(/[\.\-_]/g, " ")
-        .trim();
-
-    return { showName: beforeEpisode, episode, season, epNum };
+    return { showName, episode, season, epNum };
 }
 
 function buildMovieSearchQuery(filePath) {
@@ -438,7 +435,7 @@ function buildMovieSearchQuery(filePath) {
     return movieName;
 }
 
-async function searchSubtitles(searchQuery, episode, lang) {
+async function searchSubtitles(searchQuery, showName, episode, lang) {
     console.log(
         `[SUBTITLE] searchSubtitles: query="${searchQuery}", episode=${episode}, lang=${lang}`,
     );
@@ -478,11 +475,26 @@ async function searchSubtitles(searchQuery, episode, lang) {
             fileName: result.attributes.files[0].file_name,
             downloadCount: result.attributes.download_count || 0,
         }))
-        .filter(
-            (result) =>
-                result.fileName.includes(showName) &&
-                result.fileName.includes(episode),
-        );
+        .filter((result) => {
+            const normalizedShowName = showName
+                .toLowerCase()
+                .replace(/\./g, " ");
+            const normalizedFileName = result.fileName.toLowerCase();
+            const normalizedEpisode = episode.toLowerCase();
+
+            // Check show name (with dots replaced by spaces)
+            const showMatch = normalizedFileName.includes(normalizedShowName);
+
+            // Check episode - flexible matching
+            // Current: S01E01, should also match s01e01, 1x01, etc.
+            const episodeMatch =
+                normalizedFileName.includes(normalizedEpisode) ||
+                normalizedFileName.includes(
+                    normalizedEpisode.replace(/S(\d+)E(\d+)/i, "$1x$2"),
+                );
+
+            return showMatch && episodeMatch;
+        });
 
     if (matchedResults.length === 0) {
         console.log(`[SUBTITLE] No results matching episode ${episode}`);
@@ -525,11 +537,16 @@ async function downloadSubtitle(fileId) {
     return data.link;
 }
 
-async function fetchSubtitleFromOpenSubtitles(searchQuery, episode, lang) {
+async function fetchSubtitleFromOpenSubtitles(
+    searchQuery,
+    showName,
+    episode,
+    lang,
+) {
     console.log(
         `[SUBTITLE] fetchSubtitleFromOpenSubtitles: query="${searchQuery}", episode=${episode}, lang=${lang}`,
     );
-    const fileId = await searchSubtitles(searchQuery, episode, lang);
+    const fileId = await searchSubtitles(searchQuery, showName, episode, lang);
     const downloadLink = await downloadSubtitle(fileId);
     return downloadLink;
 }
@@ -614,6 +631,7 @@ app.get("/api/subtitles/:id", async (req, res) => {
 
         let searchQuery;
         let episode = null;
+        let showName = null;
 
         if (isTvShow) {
             const searchData = buildSearchQuery(requestedFile);
@@ -621,11 +639,9 @@ app.get("/api/subtitles/:id", async (req, res) => {
                 console.log(
                     `[SUBTITLE] Could not extract episode info from filename`,
                 );
-                return res
-                    .status(400)
-                    .json({
-                        error: "Could not extract episode info from filename",
-                    });
+                return res.status(400).json({
+                    error: "Could not extract episode info from filename",
+                });
             }
 
             console.log(
@@ -639,6 +655,7 @@ app.get("/api/subtitles/:id", async (req, res) => {
             );
             searchQuery = `${searchData.showName} ${searchData.episode} ${episodeName}`;
             episode = searchData.episode;
+            showName = searchData.showName;
 
             console.log(
                 `[SUBTITLE] Full search query: "${searchQuery}", Episode: ${episode}`,
@@ -652,6 +669,7 @@ app.get("/api/subtitles/:id", async (req, res) => {
 
         const subtitleUrl = await fetchSubtitleFromOpenSubtitles(
             searchQuery,
+            showName,
             episode,
             lang,
         );
