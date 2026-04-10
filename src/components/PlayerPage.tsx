@@ -97,7 +97,8 @@ export default function PlayerPage() {
     const playerRef = useRef<Plyr | null>(null);
 
     const isTvShow = item?.seasons !== null;
-    const hasMultipleVideos = seasons.length > 1 || seasons.some(s => s.episodes.length > 1);
+    const hasMultipleVideos =
+        seasons.length > 1 || seasons.some((s) => s.episodes.length > 1);
 
     useEffect(() => {
         loadContentDB().then((db) => {
@@ -140,7 +141,9 @@ export default function PlayerPage() {
                         if (sub.lang === "en" || sub.lang === "fr") {
                             subs.push({
                                 lang: sub.lang,
-                                label: LANG_LABELS[sub.lang] || sub.lang.toUpperCase(),
+                                label:
+                                    LANG_LABELS[sub.lang] ||
+                                    sub.lang.toUpperCase(),
                                 src: `${API_BASE}/api/subtitles/${id}?lang=${sub.lang}&file=${fileParam}`,
                             });
                         }
@@ -228,61 +231,6 @@ export default function PlayerPage() {
             </button>
             <h2>{item.name}</h2>
 
-            {isTvShow && hasMultipleVideos && selectedSeason !== null && currentSeason && (
-                <div className="season-selector">
-                    <div className="season-buttons">
-                        {seasons.map((s) => (
-                            <button
-                                key={s.season}
-                                className={selectedSeason === s.season ? "active" : ""}
-                                onClick={() => handleSeasonSelect(s.season)}
-                            >
-                                Season {s.season}
-                            </button>
-                        ))}
-                    </div>
-                    <div className="episode-list">
-                        <h4>Season {selectedSeason}</h4>
-                        {currentSeason.episodes.map((ep) => (
-                            <button
-                                key={ep.filePath}
-                                className={selectedVideo === ep.filePath ? "active" : ""}
-                                onClick={() => handleEpisodeSelect(ep)}
-                            >
-                                {ep.label}
-                            </button>
-                        ))}
-                    </div>
-                </div>
-            )}
-
-            {(audioTracks?.audio.length ?? 0) > 1 && (
-                <div className="track-selector">
-                    <button onClick={() => setShowTrackMenu(!showTrackMenu)}>
-                        ⚙️ Audio
-                    </button>
-                    {showTrackMenu && (
-                        <div className="track-menu">
-                            <div className="track-group">
-                                <h4>Audio</h4>
-                                {audioTracks?.audio.map((t) => (
-                                    <label key={t.track}>
-                                        <input
-                                            type="radio"
-                                            name="audio"
-                                            value={t.track}
-                                            checked={selectedAudio === String(t.track)}
-                                            onChange={() => setSelectedAudio(String(t.track))}
-                                        />
-                                        {t.title} ({t.language})
-                                    </label>
-                                ))}
-                            </div>
-                        </div>
-                    )}
-                </div>
-            )}
-
             {item.available ? (
                 <div className="videoplayer-container" key={containerKey}>
                     <video ref={videoRef} className="videoplayer" autoPlay>
@@ -300,6 +248,79 @@ export default function PlayerPage() {
                 </div>
             ) : (
                 <p style={{ marginLeft: "2rem" }}>No media file available.</p>
+            )}
+
+            {isTvShow &&
+                hasMultipleVideos &&
+                selectedSeason !== null &&
+                currentSeason && (
+                    <div className="season-selector">
+                        <div className="season-buttons">
+                            {seasons.map((s) => (
+                                <button
+                                    key={s.season}
+                                    className={
+                                        selectedSeason === s.season
+                                            ? "active"
+                                            : ""
+                                    }
+                                    onClick={() => handleSeasonSelect(s.season)}
+                                >
+                                    Season {s.season}
+                                </button>
+                            ))}
+                        </div>
+                        <div className="episode-list">
+                            <h4>Season {selectedSeason}</h4>
+                            {currentSeason.episodes.map((ep) => (
+                                <button
+                                    key={ep.filePath}
+                                    className={
+                                        selectedVideo === ep.filePath
+                                            ? "active"
+                                            : ""
+                                    }
+                                    onClick={() => handleEpisodeSelect(ep)}
+                                >
+                                    {ep.label}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
+            {(audioTracks?.audio.length ?? 0) > 1 && (
+                <div className="track-selector">
+                    <button onClick={() => setShowTrackMenu(!showTrackMenu)}>
+                        ⚙️ Audio
+                    </button>
+                    {showTrackMenu && (
+                        <div className="track-menu">
+                            <div className="track-group">
+                                <h4>Audio</h4>
+                                {audioTracks?.audio.map((t) => (
+                                    <label key={t.track}>
+                                        <input
+                                            type="radio"
+                                            name="audio"
+                                            value={t.track}
+                                            checked={
+                                                selectedAudio ===
+                                                String(t.track)
+                                            }
+                                            onChange={() =>
+                                                setSelectedAudio(
+                                                    String(t.track),
+                                                )
+                                            }
+                                        />
+                                        {t.title} ({t.language})
+                                    </label>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                </div>
             )}
         </>
     );

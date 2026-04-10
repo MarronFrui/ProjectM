@@ -5,3 +5,4 @@ dist
 content-info
 .env
 .env.production
+srt-to-vtt.js

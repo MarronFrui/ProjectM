@@ -503,7 +503,7 @@ async function searchSubtitles(searchQuery, showName, episode, lang) {
             const normalizedShowName = showName
                 .toLowerCase()
                 .replace(/\./g, " ");
-            const normalizedFileName = result.fileName.toLowerCase();
+            const normalizedFileName = result.fileName.toLowerCase().replace(/\./g, " ");
             const normalizedEpisode = episode.toLowerCase();
 
             // Check show name (with dots replaced by spaces)

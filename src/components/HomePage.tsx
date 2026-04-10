@@ -90,7 +90,7 @@ useEffect(() => {
     return (
         <>
             <header>
-                <h1>Homemade Netflix</h1>
+                <h1>MaxFlix</h1>
             </header>
             <nav>
                 {user ? (
