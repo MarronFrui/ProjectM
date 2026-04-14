@@ -15,7 +15,8 @@
     "preview": "vite build",
     "scrape:db": "tsx ./scraper.ts",
     "start:server": "node server.js",
-    "convert:videos": "tsx ./scripts/convert-videos.ts"
+    "convert:videos": "tsx ./scripts/convert-videos.ts",
+    "extract:sub": "tsx ./scripts/extract-subtitles.ts"
   },
   "author": "Marron",
   "license": "ISC",

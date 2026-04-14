@@ -176,7 +176,7 @@ async function fetchAndBuildItem(c: Candidate, forceAdd = false): Promise<Conten
         }
 
         const rating = details.vote_average ?? 0;
-        if (rating < 7.5) {
+        if (rating < 6) {
             console.log(`Skipping ${title}: rating too low (${rating})`);
             addSkipped(key);
             return null;
