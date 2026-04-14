@@ -12,7 +12,7 @@ const CONCURRENT = 2;
 
 const BROWSER_VIDEO_CODECS = ['h264', 'hevc', 'vp9', 'av1'];
 const BROWSER_AUDIO_CODECS = ['aac', 'mp3', 'opus'];
-const LOG_FILE = path.join(__dirname, "conversion.log");
+const LOG_FILE = "/home/marron/ProjectM/logs/conversion.log";
 
 interface ConversionResult {
     file: string;
