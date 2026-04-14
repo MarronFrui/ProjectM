@@ -11,7 +11,7 @@ body {
     text-shadow: 1px 2px 3px black;
     margin: 0;
     height: 100vh;
-    -ms-overflow-style: none; 
+    -ms-overflow-style: none;
     scrollbar-width: none;
 }
 
@@ -21,7 +21,7 @@ nav {
 }
 
 ::-webkit-scrollbar {
-  display: none;
+    display: none;
 }
 
 body.preview {
@@ -75,7 +75,10 @@ a {
     background-color: #1f1f1f;
     color: #e0e0e0;
     font-size: 0.95rem;
-    transition: width 0.3s ease, padding 0.3s ease, border-color 0.3s ease,
+    transition:
+        width 0.3s ease,
+        padding 0.3s ease,
+        border-color 0.3s ease,
         background-color 0.3s ease;
 }
 
@@ -160,7 +163,9 @@ a {
     width: 8.3vw;
     flex-direction: column;
     background-color: grey;
-    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    transition:
+        transform 0.3s ease,
+        box-shadow 0.3s ease;
     cursor: pointer;
     will-change: transform, box-shadow;
     outline: none;
@@ -206,12 +211,11 @@ a {
     cursor: pointer;
 }
 
-
 .card img {
     width: 100%;
-    height: 75%;       
-    object-fit: cover; 
-    flex-shrink: 0;    
+    height: 75%;
+    object-fit: cover;
+    flex-shrink: 0;
 }
 
 .smaller-card {
@@ -225,7 +229,9 @@ a {
     height: 4vw;
     border-radius: 1rem;
     background-color: grey;
-    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    transition:
+        transform 0.3s ease,
+        box-shadow 0.3s ease;
     cursor: pointer;
     will-change: transform, box-shadow;
     outline: none;
@@ -248,7 +254,9 @@ a {
     border-radius: 0.5rem;
     font-size: 0.95rem;
     cursor: pointer;
-    transition: background-color 0.2s ease, transform 0.2s ease;
+    transition:
+        background-color 0.2s ease,
+        transform 0.2s ease;
     text-shadow: none;
 }
 
@@ -262,7 +270,6 @@ a {
     background-color: #b0060f;
     transform: scale(1.05);
 }
-
 
 #scroll-left {
     margin-right: 0.5rem;
@@ -284,19 +291,19 @@ a {
 .available,
 .unavailable {
     display: flex;
-    flex-direction: column; 
-    flex: 1; 
-    width: 100%; 
+    flex-direction: column;
+    flex: 1;
+    width: 100%;
 }
 
 .available h2,
 .unavailable h2 {
-    margin-left: 4rem; 
+    margin-left: 4rem;
 }
 
 .card-container {
     display: grid;
-    grid-template-rows: repeat(2, 18rem); 
+    grid-template-rows: repeat(2, 18rem);
     grid-auto-flow: column;
     grid-auto-columns: 10rem;
     gap: 1rem;
@@ -311,6 +318,7 @@ a {
 
 #preview-modal {
     display: none;
+    overflow-y: auto;
     position: fixed;
     top: 0;
     left: 0;
@@ -332,6 +340,11 @@ a {
     border-radius: 1rem;
     max-width: 600px;
     width: 90%;
+    max-height: 90vh;
+    max-height: 90dvh;
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
     text-align: center;
     position: relative;
 }
@@ -355,6 +368,8 @@ a {
     background: #e50914;
     color: #fff;
     cursor: pointer;
+    align-self: center;
+    margin-top: 0.5rem;
 }
 
 #add-to-wishlist {
@@ -366,6 +381,8 @@ a {
     background: #e50914;
     color: #fff;
     cursor: pointer;
+    align-self: center;
+    margin-top: 0.5rem;
 }
 
 #preview-name {
@@ -374,12 +391,23 @@ a {
     justify-content: center;
 }
 
+#preview-description {
+    max-height: 15vh;
+    overflow-y: auto;
+    text-align: center;
+    padding: 0 1rem;
+}
+
 #preview-image {
     width: 65%;
+    max-width: 65%;
     height: auto;
+    max-height: 50vh;
+    object-fit: contain;
     margin-bottom: 1rem;
-    object-fit: cover;
     border-radius: 4px;
+    flex-shrink: 1;
+    align-self: center;
 }
 
 .videoplayer-container {
@@ -389,7 +417,7 @@ a {
     justify-content: center;
     align-items: center;
     margin: 2rem auto;
-    min-height: 50vh; 
+    min-height: 50vh;
 }
 
 .videoplayer {
@@ -397,7 +425,7 @@ a {
     width: auto;
     aspect-ratio: 16 / 9;
     border-radius: 12px;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
 }
 
 .plyr__controls {
@@ -413,7 +441,7 @@ a {
 
 #available-cards:empty,
 #unavailable-cards:empty {
-    display: none;       
+    display: none;
 }
 
 .login-page {
@@ -422,9 +450,9 @@ a {
     align-items: center;
     justify-content: center;
     background: #141414;
-    font-family: 'Georgia', serif;
+    font-family: "Georgia", serif;
 }
- 
+
 .login-noise {
     position: fixed;
     inset: 0;
@@ -432,7 +460,7 @@ a {
     pointer-events: none;
     z-index: 0;
 }
- 
+
 .login-wrapper {
     position: relative;
     z-index: 1;
@@ -440,12 +468,12 @@ a {
     max-width: 420px;
     padding: 0 1.5rem;
 }
- 
+
 .login-logo {
     text-align: center;
     margin-bottom: 2.5rem;
 }
- 
+
 .login-logo-title {
     color: #e50914;
     font-size: 2rem;
@@ -454,7 +482,7 @@ a {
     margin: 0;
     text-shadow: 0 0 40px rgba(229, 9, 20, 0.4);
 }
- 
+
 .login-logo-subtitle {
     color: #666;
     font-size: 0.75rem;
@@ -463,15 +491,17 @@ a {
     margin: 0.25rem 0 0;
     text-shadow: none;
 }
- 
+
 .login-card {
     background: rgba(20, 20, 20, 0.95);
     border: 1px solid rgba(255, 255, 255, 0.08);
     border-radius: 12px;
     padding: 2.5rem;
-    box-shadow: 0 25px 60px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(229, 9, 20, 0.05);
+    box-shadow:
+        0 25px 60px rgba(0, 0, 0, 0.8),
+        0 0 0 1px rgba(229, 9, 20, 0.05);
 }
- 
+
 .login-heading {
     color: aliceblue;
     font-size: 1.4rem;
@@ -479,19 +509,19 @@ a {
     margin: 0 0 2rem;
     text-shadow: none;
 }
- 
+
 .login-form {
     display: flex;
     flex-direction: column;
     gap: 1rem;
 }
- 
+
 .login-field {
     display: flex;
     flex-direction: column;
     gap: 0.4rem;
 }
- 
+
 .login-label {
     color: #888;
     font-size: 0.75rem;
@@ -499,7 +529,7 @@ a {
     text-transform: uppercase;
     text-shadow: none;
 }
- 
+
 .login-input {
     background: #1a1a1a;
     border: 1px solid rgba(255, 255, 255, 0.1);
@@ -511,11 +541,11 @@ a {
     transition: border-color 0.2s;
     font-family: inherit;
 }
- 
+
 .login-input:focus {
     border-color: #e50914;
 }
- 
+
 .login-error {
     color: #e50914;
     font-size: 0.85rem;
@@ -526,7 +556,7 @@ a {
     border-radius: 4px;
     border: 1px solid rgba(229, 9, 20, 0.2);
 }
- 
+
 .login-btn-submit {
     margin-top: 0.5rem;
     background: #e50914;
@@ -537,29 +567,31 @@ a {
     font-size: 0.95rem;
     font-weight: 600;
     cursor: pointer;
-    transition: background 0.2s, transform 0.1s;
+    transition:
+        background 0.2s,
+        transform 0.1s;
     letter-spacing: 0.05em;
     text-shadow: none;
 }
- 
+
 .login-btn-submit:hover {
     background: #f40612;
 }
- 
+
 .login-btn-submit:focus {
     outline: 3px solid #e50914;
     outline-offset: 2px;
 }
- 
+
 .login-btn-loading {
     background: #7a0008;
     cursor: not-allowed;
 }
- 
+
 .login-btn-loading:hover {
     background: #7a0008;
 }
- 
+
 .login-footer {
     text-align: center;
     color: #444;
@@ -570,7 +602,7 @@ a {
 }
 
 .track-selector {
-    margin: 0 6rem 1rem;
+    margin: 0 6rem;
     position: relative;
 }
 
@@ -641,7 +673,9 @@ a {
     border-radius: 0.25rem;
     cursor: pointer;
     font-size: 0.9rem;
-    transition: background 0.2s, color 0.2s;
+    transition:
+        background 0.2s,
+        color 0.2s;
 }
 
 .season-buttons button:hover {
@@ -679,7 +713,9 @@ a {
     font-size: 0.9rem;
     margin: 0.25rem;
     min-width: 100px;
-    transition: background 0.2s, color 0.2s;
+    transition:
+        background 0.2s,
+        color 0.2s;
 }
 
 .episode-list button:hover {

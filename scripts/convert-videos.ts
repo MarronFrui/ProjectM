@@ -8,13 +8,28 @@ const execAsync = promisify(exec);
 
 const MEDIA_PATH = "/mnt/media";
 const VIDEO_EXTENSIONS = [".mkv", ".avi", ".mov", ".webm"];
-const CONCURRENT = 2; // Process 2 files at once
+const CONCURRENT = 2;
+
+const BROWSER_VIDEO_CODECS = ['h264', 'hevc', 'vp9', 'av1'];
+const BROWSER_AUDIO_CODECS = ['aac', 'mp3', 'opus'];
+const LOG_FILE = path.join(__dirname, "conversion.log");
 
 interface ConversionResult {
     file: string;
     success: boolean;
     skipped?: boolean;
     error?: string;
+}
+
+async function logResult(status: 'SUCCESS' | 'SKIPPED' | 'ERROR', file: string, message?: string) {
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const logLine = `[${timestamp}] [${status}] ${file}${message ? ` - ${message}` : ''}\n`;
+    try {
+        await fs.appendFile(LOG_FILE, logLine);
+        console.log(`  📝 Logged: [${status}] ${file}`);
+    } catch (err) {
+        console.error(`  ⚠️  Failed to write log: ${err}`);
+    }
 }
 
 async function findVideoFiles(dir: string): Promise<string[]> {
@@ -52,17 +67,18 @@ async function needsConversion(inputPath: string): Promise<boolean> {
             (s: any) => s.codec_type === "audio"
         );
 
-        // Skip if already H.264 + AAC
-        if (
-            videoStream?.codec_name === "h264" &&
-            audioStream?.codec_name === "aac"
-        ) {
+        const isVideoCompatible = BROWSER_VIDEO_CODECS.includes(videoStream?.codec_name);
+        const isAudioCompatible = BROWSER_AUDIO_CODECS.includes(audioStream?.codec_name);
+
+        if (isVideoCompatible && isAudioCompatible) {
+            await logResult('SKIPPED', path.basename(inputPath), `Video: ${videoStream?.codec_name}, Audio: ${audioStream?.codec_name} - Browser compatible`);
             return false;
         }
 
         return true;
-    } catch {
-        return true; // If probe fails, assume needs conversion
+    } catch (err) {
+        console.error(`  ⚠️  ffprobe failed for ${path.basename(inputPath)}: ${err}`);
+        return true;
     }
 }
 
@@ -107,19 +123,34 @@ function convertVideo(inputPath: string): Promise<void> {
         });
 
         ffmpeg.on("close", async (code) => {
-            process.stdout.write("\n"); // Clear progress line
+            process.stdout.write("\n");
 
             if (code !== 0) {
+                // Delete incomplete .mp4 file on failure
+                try {
+                    await fs.unlink(outputPath);
+                    console.log(`  🗑️  Deleted incomplete: ${path.basename(outputPath)}`);
+                } catch {}
+
+                // Log error
+                await logResult('ERROR', path.basename(inputPath), `ffmpeg failed with code ${code}`);
+
                 reject(new Error(`ffmpeg failed with code ${code}`));
                 return;
             }
 
+            // Log success
+            await logResult('SUCCESS', path.basename(inputPath), 'Converted to MP4');
+
+            // Delete original .mkv after successful conversion
             try {
                 await fs.unlink(inputPath);
-                resolve();
+                console.log(`  🗑️  Deleted original: ${path.basename(inputPath)}`);
             } catch (err) {
-                reject(new Error(`Failed to delete original: ${err}`));
+                console.error(`  ⚠️  Failed to delete original: ${err}`);
             }
+
+            resolve();
         });
 
         ffmpeg.on("error", (err) => {

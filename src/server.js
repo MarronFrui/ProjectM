@@ -423,8 +423,14 @@ async function getSubtitleCachePath(itemId, lang, requestedFile = null) {
         vttFileName = `${lang}.vtt`;
     }
 
-    const fileName = requestedFile.split("/").pop() || "";
-    const withoutFile = requestedFile.replace(fileName, "");
+    // Strip /media/ prefix from requestedFile to fix path construction
+    let relativePath = requestedFile;
+    if (relativePath.startsWith('/media/')) {
+        relativePath = relativePath.replace('/media/', '/');
+    }
+
+    const fileName = relativePath.split("/").pop() || "";
+    const withoutFile = path.dirname(relativePath);
     const subsFolder = path.join(withoutFile, "subs");
     const vttPath = path.join(MEDIA_PATH, subsFolder, vttFileName);
 
