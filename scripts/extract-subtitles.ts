@@ -5,57 +5,14 @@ import { promisify } from "util";
 
 const execAsync = promisify(exec);
 
-const FFMPEG_PATH = "ffmpeg";
+const FFMPEG_EXE = "ffmpeg.exe";
 const TIMEOUT_SECONDS = 120;
 const LOG_FILE = "/home/marron/ProjectM/logs/extract-subtitles.log";
 
 interface SubtitleStream {
-    index: number;
-    language: string;
+    streamIndex: string;
     codec: string;
-}
-
-function cleanSubtitleText(text: string): string {
-    text = text.replace(/<[^>]*>/g, "");
-    text = text.replace(/\{[^}]*\}/g, "");
-    text = text.replace(/&nbsp;/g, " ");
-    text = text.replace(/&amp;/g, "&");
-    text = text.replace(/&lt;/g, "<");
-    text = text.replace(/&gt;/g, ">");
-    text = text.replace(/\s+/g, " ");
-    return text.trim();
-}
-
-function srtToVtt(srtContent: string): string {
-    const vttLines: string[] = ["WEBVTT", ""];
-
-    const blocks = srtContent.trim().split(/\n\s*\n/);
-
-    for (const block of blocks) {
-        const lines = block.split(/\r?\n/).filter((line: string) => line.length > 0);
-
-        if (lines.length < 2) continue;
-
-        const timestampLine = lines.find((line: string) => /-->/.test(line));
-        if (!timestampLine) continue;
-
-        const timestampIndex = lines.indexOf(timestampLine);
-        const subtitleLines = lines.slice(timestampIndex + 1);
-
-        const cleanedLines = subtitleLines
-        .map(line => cleanSubtitleText(line))
-        .filter(line => line.length > 0);
-
-        if (cleanedLines.length === 0) continue;
-
-        const vttTimestamp = timestampLine.replace(/,/g, ".");
-
-        vttLines.push(vttTimestamp);
-        vttLines.push(...cleanedLines);
-        vttLines.push("");
-    }
-
-    return vttLines.join("\n");
+    language: string;
 }
 
 async function logResult(status: string, file: string, message?: string): Promise<void> {
@@ -81,6 +38,16 @@ function getEpisodeIdFromFilename(filePath: string): string | null {
     return null;
 }
 
+function toWindowsPath(wslPath: string): string {
+    const match = wslPath.match(/^\/mnt\/([a-z])\/(.*)/i);
+    if (match) {
+        const drive = match[1].toUpperCase();
+        const rest = match[2].replace(/\//g, "\\");
+        return `${drive}:\\${rest}`;
+    }
+    return wslPath.replace(/\//g, "\\");
+}
+
 async function findMkvFiles(dir: string): Promise<string[]> {
     const results: string[] = [];
     try {
@@ -100,56 +67,62 @@ async function findMkvFiles(dir: string): Promise<string[]> {
     return results;
 }
 
-async function probeSubtitleStreams(mkvPath: string): Promise<SubtitleStream[]> {
-    try {
-        const { stdout } = await execAsync(
-            `timeout ${TIMEOUT_SECONDS} ${FFMPEG_PATH} -i "${mkvPath}" -f null - 2>&1`,
-            { shell: true }
-        );
+function srtToVtt(srtContent: string): string {
+    const vttLines = ["WEBVTT", ""];
+    const blocks = srtContent.trim().split(/\n\s*\n/);
 
-        return parseStreamsFromOutput(stdout);
+    for (const block of blocks) {
+        const lines = block.split(/\r?\n/).filter((line) => line.length > 0);
+        if (lines.length < 2) continue;
+
+        const timestampLine = lines.find((line) => /-->/.test(line));
+        if (!timestampLine) continue;
+
+        const timestampIndex = lines.indexOf(timestampLine);
+        const subtitleLines = lines.slice(timestampIndex + 1);
+        const vttTimestamp = timestampLine.replace(/,/g, ".");
+
+        vttLines.push(vttTimestamp);
+        vttLines.push(...subtitleLines);
+        vttLines.push("");
+    }
+
+    return vttLines.join("\n");
+}
+
+async function probeSubtitleStreams(mkvPath: string): Promise<SubtitleStream[]> {
+    const winPath = toWindowsPath(mkvPath);
+    try {
+        await execAsync(
+            `timeout ${TIMEOUT_SECONDS} "${FFMPEG_EXE}" -i "${winPath}"`,
+        );
+        return [];
     } catch (err: any) {
-        if (err.stdout) {
-            return parseStreamsFromOutput(err.stdout);
+        if (err.stderr) {
+            return parseFfmpegSubtitleStreams(err.stderr);
         }
         return [];
     }
 }
 
-function parseStreamsFromOutput(output: string): SubtitleStream[] {
+function parseFfmpegSubtitleStreams(ffmpegOutput: string): SubtitleStream[] {
+    const lines = ffmpegOutput.split("\n");
     const streams: SubtitleStream[] = [];
-    const lines = output.split("\n");
+    let subtitleIndex = 0;
 
     for (const line of lines) {
-        const match = line.match(/Stream #0:(\d+)\(([a-z]{3})\):.*Subtitle: (\w+)/i);
-        if (match) {
+        const streamMatch = line.match(/Stream #(0:\d+)(?:\((\w+)\))?: Subtitle: (\w+)/i);
+        if (streamMatch) {
             streams.push({
-                index: parseInt(match[1]),
-                language: match[2].toLowerCase(),
-                codec: match[3].toLowerCase(),
+                streamIndex: `s:${subtitleIndex}`,
+                language: streamMatch[2] || "und",
+                codec: streamMatch[3].toLowerCase(),
             });
+            subtitleIndex++;
         }
     }
 
     return streams;
-}
-
-async function extractSubtitle(mkvPath: string, streamIndex: number, outputSrtPath: string): Promise<boolean> {
-    try {
-        await execAsync(
-            `timeout ${TIMEOUT_SECONDS} ${FFMPEG_PATH} -i "${mkvPath}" -map "0:${streamIndex}" -y "${outputSrtPath}" 2>&1`,
-            { shell: true }
-        );
-        return true;
-    } catch (err: any) {
-        if (err.code === 124) {
-            return false;
-        }
-        if (err.stdout && err.stdout.includes("matches no streams")) {
-            return false;
-        }
-        return true;
-    }
 }
 
 function showFileProgress(filename: string, current: number, total: number): void {
@@ -168,19 +141,19 @@ function clearProgressLine(): void {
 async function processMkvFile(mkvPath: string, fileIndex: number, totalFiles: number): Promise<number> {
     const baseName = path.basename(mkvPath, path.extname(mkvPath));
     const mkvDir = path.dirname(mkvPath);
-    const subsDir = path.join(mkvDir, "subs");
+    const subsDir = path.join(mkvDir, "Subs");
 
     console.log(`[${fileIndex}/${totalFiles}] Processing: ${baseName}...`);
 
     const streams = await probeSubtitleStreams(mkvPath);
 
     if (streams.length === 0) {
-        console.log(`  [SKIP] No subtitle streams found`);
-        await logResult("SKIP", baseName, "No subtitle streams found");
+        console.log(`  [SKIP] No subtitle tracks found`);
+        await logResult("SKIP", baseName, "No subtitle tracks found");
         return 0;
     }
 
-    console.log(`  Found ${streams.length} subtitle stream(s)`);
+    console.log(`  Found ${streams.length} track(s)`);
 
     try {
         await fs.access(subsDir);
@@ -203,51 +176,65 @@ async function processMkvFile(mkvPath: string, fileIndex: number, totalFiles: nu
         let outputFileName: string;
         if (episodeId) {
             outputFileName = count === 0
-                ? `${episodeId}_${lang}.vtt`
-                : `${episodeId}_${lang}_${count + 1}.vtt`;
+                ? `${episodeId}_${lang}`
+                : `${episodeId}_${lang}_${count + 1}`;
         } else {
             outputFileName = count === 0
-                ? `${lang}.vtt`
-                : `${lang}_${count + 1}.vtt`;
+                ? `${lang}`
+                : `${lang}_${count + 1}`;
         }
 
-        const outputVttPath = path.join(subsDir, outputFileName);
+        const isAss = stream.codec === "ass" || stream.codec === "ssa";
+        const outputExt = isAss ? "ass" : "vtt";
+        outputFileName = `${outputFileName}.${outputExt}`;
+
+        const outputPath = path.join(subsDir, outputFileName);
 
         try {
-            await fs.access(outputVttPath);
+            await fs.access(outputPath);
             console.log(`  [SKIP] ${outputFileName} (already exists)`);
             continue;
         } catch {}
 
-        const tempSrtPath = path.join(mkvDir, `temp_${Date.now()}.srt`);
-
-        const success = await extractSubtitle(mkvPath, stream.index, tempSrtPath);
-
-        if (!success) {
-            try {
-                await fs.unlink(tempSrtPath);
-            } catch {}
-            continue;
-        }
+        const winInputPath = toWindowsPath(mkvPath);
+        const winOutputPath = toWindowsPath(outputPath);
 
         try {
-            const srtContent = await fs.readFile(tempSrtPath, "utf-8");
-            const vttContent = srtToVtt(srtContent);
+            if (isAss) {
+                await execAsync(
+                    `timeout ${TIMEOUT_SECONDS} "${FFMPEG_EXE}" -i "${winInputPath}" -map 0:${stream.streamIndex} -c:s copy "${winOutputPath}" -y`,
+                );
+            } else {
+                const tempSrtPath = path.join(mkvDir, `temp_${Date.now()}.srt`);
+                const winTempSrtPath = toWindowsPath(tempSrtPath);
 
-            if (vttContent.split("\n").length <= 2) {
-                await fs.unlink(tempSrtPath);
-                continue;
+                await execAsync(
+                    `timeout ${TIMEOUT_SECONDS} "${FFMPEG_EXE}" -i "${winInputPath}" -map 0:${stream.streamIndex} -c:s copy "${winTempSrtPath}" -y`,
+                );
+
+                try {
+                    await fs.access(tempSrtPath);
+                    const srtContent = await fs.readFile(tempSrtPath, "utf-8");
+                    const vttContent = srtToVtt(srtContent);
+                    await fs.writeFile(outputPath, vttContent, "utf-8");
+                    await fs.unlink(tempSrtPath);
+                } catch {
+                    console.log(`  [FAIL] ${outputFileName}: SRT extraction failed`);
+                    await logResult("ERROR", baseName, `Failed: ${outputFileName} - SRT extraction failed`);
+                    continue;
+                }
             }
 
-            await fs.writeFile(outputVttPath, vttContent);
-            await fs.unlink(tempSrtPath);
-            extractedCount++;
-            console.log(`  [OK] ${outputFileName}`);
-            await logResult("SUCCESS", baseName, `Extracted: ${outputFileName}`);
-        } catch (err) {
             try {
-                await fs.unlink(tempSrtPath);
-            } catch {}
+                await fs.access(outputPath);
+                extractedCount++;
+                console.log(`  [OK] ${outputFileName}`);
+                await logResult("SUCCESS", baseName, `Extracted: ${outputFileName}`);
+            } catch {
+                console.log(`  [FAIL] ${outputFileName}: Output not created`);
+                await logResult("ERROR", baseName, `Failed: ${outputFileName} - Output not created`);
+            }
+        } catch (err) {
             console.log(`  [FAIL] ${outputFileName}: ${(err as Error).message}`);
             await logResult("ERROR", baseName, `Failed: ${outputFileName} - ${(err as Error).message}`);
         }
