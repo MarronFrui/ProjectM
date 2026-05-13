@@ -141,7 +141,7 @@ function clearProgressLine(): void {
 async function processMkvFile(mkvPath: string, fileIndex: number, totalFiles: number): Promise<number> {
     const baseName = path.basename(mkvPath, path.extname(mkvPath));
     const mkvDir = path.dirname(mkvPath);
-    const subsDir = path.join(mkvDir, "Subs");
+    const subsDir = path.join(mkvDir, "subs");
 
     console.log(`[${fileIndex}/${totalFiles}] Processing: ${baseName}...`);
 

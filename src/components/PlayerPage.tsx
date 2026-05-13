@@ -33,12 +33,12 @@ interface SeasonInfo {
     episodes: EpisodeInfo[];
 }
 
-const API_BASE = import.meta.env.VITE_API_URL || "http://192.168.5.67:3000";
+const API_BASE = import.meta.env.VITE_URL;
 
 const LANG_LABELS: Record<string, string> = {
     en: "English",
     fr: "French",
-    jpn: "Japanese",
+    ja: "Japanese",
     de: "German",
     es: "Spanish",
     it: "Italian",
@@ -138,29 +138,13 @@ export default function PlayerPage() {
                         const parsed = parseEpisodeFromPath(file);
                         if (parsed) setSelectedSeason(parsed.season);
                     } else if (organized.length > 0) {
-                        const saved = localStorage.getItem(`player-${id}-lastFile`);
-                        const match = saved && organized.some(s =>
-                            s.episodes.some(e => e.filePath === saved)
-                        );
-                        if (match) {
-                            setSelectedVideo(saved);
-                            const parsed = parseEpisodeFromPath(saved);
-                            if (parsed) setSelectedSeason(parsed.season);
-                        } else {
-                            setSelectedSeason(organized[0].season);
-                            setSelectedVideo(organized[0].episodes[0].filePath);
-                        }
+                        setSelectedSeason(organized[0].season);
+                        setSelectedVideo(organized[0].episodes[0].filePath);
                     }
                 }
             }
         });
     }, [id, file]);
-
-    useEffect(() => {
-        if (selectedVideo) {
-            localStorage.setItem(`player-${id}-lastFile`, selectedVideo);
-        }
-    }, [id, selectedVideo]);
 
     useEffect(() => {
         if (item && id && selectedVideo) {

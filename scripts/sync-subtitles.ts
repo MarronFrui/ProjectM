@@ -144,10 +144,10 @@ async function main(): Promise<void> {
     }
 
     const subsDirs = await findSubsDirs(sourceDir);
-    console.log(`Found ${subsDirs.length} Subs/ folder(s)\n`);
+    console.log(`Found ${subsDirs.length} subs/ folder(s)\n`);
 
     if (subsDirs.length === 0) {
-        console.log("No Subs/ folders found.");
+        console.log("No subs/ folders found.");
         return;
     }
 
