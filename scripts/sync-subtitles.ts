@@ -1,6 +1,6 @@
 import fs from "fs/promises";
 import path from "path";
-import { exec } from "child_process";
+import { exec, spawn } from "child_process";
 import { promisify } from "util";
 
 const execAsync = promisify(exec);
@@ -19,6 +19,21 @@ function sshCmd(cmd: string): string {
 function rsyncCmd(flag: string, source: string, dest: string): string {
     const sshOpt = `ssh -S "${SSH_SOCKET}"`;
     return `rsync -av --update ${flag} -e "${sshOpt}" "${source}/" "${SSH_USER}@${SSH_HOST}:${dest}/"`;
+}
+
+function sudoSshCmd(cmd: string): string {
+    return `ssh -t -S "${SSH_SOCKET}" ${SSH_USER}@${SSH_HOST} "sudo ${cmd}"`;
+}
+
+async function runInteractive(cmd: string): Promise<void> {
+    return new Promise((resolve, reject) => {
+        const child = spawn("sh", ["-c", cmd], { stdio: "inherit" });
+        child.on("close", (code) => {
+            if (code === 0) resolve();
+            else reject(new Error(`Failed with exit code ${code}`));
+        });
+        child.on("error", reject);
+    });
 }
 
 async function logResult(status: string, relPath: string, message?: string): Promise<void> {
@@ -87,7 +102,7 @@ async function syncSubsFolder(
     const prefix = apply ? "  " : "  [DRY-RUN]";
 
     if (apply) {
-        await execAsync(sshCmd(`"mkdir -p '${serverSubs}'"`));
+        await runInteractive(sudoSshCmd(`mkdir -p '${serverSubs}' && sudo chown ${SSH_USER}:${SSH_USER} '${serverSubs}'`));
     }
 
     const flag = apply ? "" : "--dry-run";

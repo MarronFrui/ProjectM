@@ -805,6 +805,14 @@ app.get("/api/subtitles-available/:id", async (req, res) => {
 
         const subtitles = await getAvailableSubtitles(requestedFile);
         const available = subtitles.map(s => ({ lang: s.lang, cached: true }));
+        const seen = new Set(available.map(s => s.lang));
+
+        const DEFAULT_LANGS = ["en", "fr"];
+        for (const lang of DEFAULT_LANGS) {
+            if (!seen.has(lang)) {
+                available.push({ lang, cached: false });
+            }
+        }
 
         console.log(`[SUBTITLE] Returning available:`, available);
         res.json(available);
