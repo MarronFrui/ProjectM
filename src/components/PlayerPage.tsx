@@ -18,6 +18,7 @@ interface Tracks {
 
 interface ExternalSubtitle {
     lang: string;
+    trackLang: string;
     label: string;
     src: string;
     format: "vtt" | "ass";
@@ -138,8 +139,6 @@ export default function PlayerPage() {
     const [selectedVideo, setSelectedVideo] = useState<string | null>(null);
     const [audioTracks, setAudioTracks] = useState<Tracks | null>(null);
     const [subtitleTracks, setSubtitleTracks] = useState<ExternalSubtitle[]>([]);
-    const assLangsRef = useRef<Set<string>>(new Set());
-    const [selectedAssLang, setSelectedAssLang] = useState<string | null>(null);
     const [selectedAudio, setSelectedAudio] = useState("0");
     const [showTrackMenu, setShowTrackMenu] = useState(false);
     const navigate = useNavigate();
@@ -147,7 +146,8 @@ export default function PlayerPage() {
     const videoRef = useRef<HTMLVideoElement>(null);
     const playerRef = useRef<Plyr | null>(null);
     const assContainerRef = useRef<HTMLDivElement>(null);
-    const assInstancesRef = useRef<ASS[]>([]);
+    const assInstancesRef = useRef<Map<string, ASS>>(new Map());
+    const subtitleTracksRef = useRef<ExternalSubtitle[]>([]);
 
     const isTvShow = item?.seasons !== null;
     const hasMultipleVideos =
@@ -178,55 +178,88 @@ export default function PlayerPage() {
     }, [id, file]);
 
     useEffect(() => {
-        if (item && id && selectedVideo) {
-            const fileParam = encodeURIComponent(selectedVideo);
+        if (!item || !id || !selectedVideo) return;
+        const fileParam = encodeURIComponent(selectedVideo);
+        let active = true;
 
-            fetch(`${API_BASE}/api/tracks/${id}?file=${fileParam}`)
-                .then((r) => r.json())
-                .then((t) => setAudioTracks(t))
-                .catch(console.error);
+        assInstancesRef.current.forEach(a => a.destroy());
+        assInstancesRef.current.clear();
 
-            fetch(`${API_BASE}/api/subtitles-available/${id}?file=${fileParam}`)
-                .then((r) => r.json())
-                .then((available) => {
-                    const byLang: Record<string, typeof available> = {};
-                    for (const sub of available) {
-                        if (!byLang[sub.lang]) byLang[sub.lang] = [];
-                        byLang[sub.lang].push(sub);
-                    }
+        fetch(`${API_BASE}/api/tracks/${id}?file=${fileParam}`)
+            .then((r) => r.json())
+            .then((t) => setAudioTracks(t))
+            .catch(console.error);
 
-                    const tracks: ExternalSubtitle[] = [];
-                    const assLangs = new Set<string>();
-                    for (const [lang, entries] of Object.entries(byLang)) {
-                        const assEntry = entries.find((e: any) => (e.format || "vtt") === "ass");
-                        if (assEntry) {
-                            assLangs.add(lang);
+        fetch(`${API_BASE}/api/subtitles-available/${id}?file=${fileParam}`)
+            .then((r) => r.json())
+            .then((available) => {
+                if (!active) return;
+
+                const byLang: Record<string, typeof available> = {};
+                for (const sub of available) {
+                    if (!byLang[sub.lang]) byLang[sub.lang] = [];
+                    byLang[sub.lang].push(sub);
+                }
+
+                const tracks: ExternalSubtitle[] = [];
+                for (const [lang, entries] of Object.entries(byLang)) {
+                    const assEntry = entries.find((e: any) => (e.format || "vtt") === "ass");
+                    if (assEntry) {
+                        tracks.push({
+                            lang,
+                            trackLang: lang,
+                            label: LANG_LABELS[lang] || lang.toUpperCase(),
+                            src: `${API_BASE}/api/subtitles/${id}?lang=${lang}&file=${fileParam}&track=true`,
+                            format: "ass",
+                        });
+                    } else {
+                        const vttEntries = entries.filter((e: any) => (e.format || "vtt") === "vtt");
+                        vttEntries.forEach((_entry: any, i: number) => {
+                            const label = i === 0
+                                ? (LANG_LABELS[lang] || lang.toUpperCase())
+                                : `${LANG_LABELS[lang] || lang.toUpperCase()} (${i + 1})`;
                             tracks.push({
                                 lang,
-                                label: LANG_LABELS[lang] || lang.toUpperCase(),
-                                src: `${API_BASE}/api/subtitles/${id}?lang=${lang}&file=${fileParam}&track=true`,
-                                format: "ass",
+                                trackLang: i === 0 ? lang : `${lang}-${i + 1}`,
+                                label,
+                                src: `${API_BASE}/api/subtitles/${id}?lang=${lang}&file=${fileParam}`,
+                                format: "vtt",
                             });
-                        } else {
-                            const vttEntries = entries.filter((e: any) => (e.format || "vtt") === "vtt");
-                            vttEntries.forEach((_entry: any, i: number) => {
-                                const label = i === 0
-                                    ? (LANG_LABELS[lang] || lang.toUpperCase())
-                                    : `${LANG_LABELS[lang] || lang.toUpperCase()} (${i + 1})`;
-                                tracks.push({
-                                    lang,
-                                    label,
-                                    src: `${API_BASE}/api/subtitles/${id}?lang=${lang}&file=${fileParam}`,
-                                    format: "vtt",
-                                });
-                            });
-                        }
+                        });
                     }
-                    setSubtitleTracks(tracks);
-                    assLangsRef.current = assLangs;
-                })
-                .catch(console.error);
-        }
+                }
+
+                setSubtitleTracks(tracks);
+                subtitleTracksRef.current = tracks;
+
+                const video = videoRef.current;
+                const container = assContainerRef.current;
+                if (!video || !container) return;
+
+                for (const track of tracks) {
+                    if (track.format !== 'ass') continue;
+                    const realSrc = track.src.replace('&track=true', '');
+                    fetch(realSrc)
+                        .then(r => r.text())
+                        .then(content => {
+                            if (!active || !assContainerRef.current) return;
+                            const ass = new ASS(content, video, { container });
+                            ass.hide();
+                            assInstancesRef.current.set(track.lang, ass);
+                            if (!video.paused) {
+                                video.dispatchEvent(new Event('playing'));
+                            }
+                        })
+                        .catch(console.error);
+                }
+            })
+            .catch(console.error);
+
+        return () => {
+            active = false;
+            assInstancesRef.current.forEach(a => a.destroy());
+            assInstancesRef.current.clear();
+        };
     }, [item, id, selectedVideo]);
 
     useEffect(() => {
@@ -259,11 +292,21 @@ export default function PlayerPage() {
                 });
 
                 player.on('languagechange', () => {
-                    const lang = (player as any).language;
-                    if (lang && assLangsRef.current.has(lang)) {
-                        setSelectedAssLang(lang);
-                    } else {
-                        setSelectedAssLang(null);
+                    assInstancesRef.current.forEach(a => a.hide());
+
+                    const node = (player as any).captions?.currentTrackNode;
+                    const trackLang = node?.language;
+                    if (!trackLang) return;
+
+                    const match = subtitleTracksRef.current.find(s => s.trackLang === trackLang);
+                    if (match && match.format === 'ass') {
+                        const instance = assInstancesRef.current.get(match.lang);
+                        if (instance) {
+                            instance.show();
+                            if (!video.paused) {
+                                video.dispatchEvent(new Event('playing'));
+                            }
+                        }
                     }
                 });
 
@@ -284,35 +327,6 @@ export default function PlayerPage() {
     }, [item, selectedAudio, selectedVideo]);
 
     const containerKey = `${id}-${selectedVideo}`;
-
-    useEffect(() => {
-        assInstancesRef.current.forEach(a => a.destroy());
-        assInstancesRef.current = [];
-
-        if (!selectedAssLang || !videoRef.current || !assContainerRef.current) return;
-
-        const video = videoRef.current;
-        const container = assContainerRef.current;
-        const fileParam = selectedVideo ? encodeURIComponent(selectedVideo) : "";
-        const assSrc = `${API_BASE}/api/subtitles/${id}?lang=${selectedAssLang}&file=${fileParam}`;
-        let active = true;
-
-        fetch(assSrc)
-            .then(r => r.text())
-            .then(content => {
-                if (!active) return;
-                const ass = new ASS(content, video, { container });
-                ass.show();
-                assInstancesRef.current.push(ass);
-            })
-            .catch(console.error);
-
-        return () => {
-            active = false;
-            assInstancesRef.current.forEach(a => a.destroy());
-            assInstancesRef.current = [];
-        };
-    }, [selectedAssLang, containerKey]);
 
     if (!item) return <div>Loading...</div>;
 
@@ -355,7 +369,7 @@ export default function PlayerPage() {
                                     key={`${sub.lang}-${sub.label}`}
                                     kind="subtitles"
                                     src={sub.src}
-                                    srcLang={sub.lang}
+                                    srcLang={sub.trackLang}
                                     label={sub.label}
                                 />
                             ))}
