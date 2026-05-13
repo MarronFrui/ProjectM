@@ -407,35 +407,54 @@ function getEpisodeIdFromPath(filePath) {
     return null;
 }
 
-async function getSubtitleCachePath(itemId, lang, requestedFile = null) {
-    console.log(
-        `[SUBTITLE] getSubtitleCachePath called: ${itemId}, ${lang}, file=${requestedFile}`,
-    );
-
+function getSubsDirPath(requestedFile) {
     if (!requestedFile) return null;
-
-    const episodeId = getEpisodeIdFromPath(requestedFile);
-    let vttFileName;
-
-    if (episodeId) {
-        vttFileName = `${episodeId}_${lang}.vtt`;
-    } else {
-        vttFileName = `${lang}.vtt`;
-    }
-
-    // Strip /media/ prefix from requestedFile to fix path construction
     let relativePath = requestedFile;
     if (relativePath.startsWith('/media/')) {
         relativePath = relativePath.replace('/media/', '/');
     }
-
-    const fileName = relativePath.split("/").pop() || "";
     const withoutFile = path.dirname(relativePath);
-    const subsFolder = path.join(withoutFile, "subs");
-    const vttPath = path.join(MEDIA_PATH, subsFolder, vttFileName);
+    return path.join(MEDIA_PATH, withoutFile, "Subs");
+}
 
-    console.log(`[SUBTITLE] VTT path: ${vttPath}`);
-    return vttPath;
+function getSubsFileName(requestedFile, lang, suffix = "") {
+    const episodeId = getEpisodeIdFromPath(requestedFile);
+    if (episodeId) {
+        return `${episodeId}_${lang}${suffix}.vtt`;
+    }
+    return `${lang}${suffix}.vtt`;
+}
+
+async function getAvailableSubtitles(requestedFile) {
+    const subsDir = getSubsDirPath(requestedFile);
+    if (!subsDir) return [];
+
+    try {
+        await fs.access(subsDir);
+    } catch {
+        return [];
+    }
+
+    try {
+        const files = await fs.readdir(subsDir);
+        const subtitles = [];
+        const seen = new Set();
+
+        for (const file of files) {
+            const match = file.match(/(?:S\d+E\d+_)?([a-z]{3})(?:_ext)?\.(vtt|ass)$/i);
+            if (match) {
+                const lang = match[1].toLowerCase();
+                if (!seen.has(lang)) {
+                    seen.add(lang);
+                    subtitles.push({ lang, file });
+                }
+            }
+        }
+
+        return subtitles;
+    } catch {
+        return [];
+    }
 }
 
 function buildSearchQuery(filePath) {
@@ -642,21 +661,48 @@ app.get("/api/subtitles/:id", async (req, res) => {
         res.setHeader("Access-Control-Allow-Origin", "*");
         res.setHeader("Content-Type", "text/vtt");
 
-        const vttPath = await getSubtitleCachePath(id, lang, requestedFile);
-        if (!vttPath) {
+        const subsDir = getSubsDirPath(requestedFile);
+        if (!subsDir) {
             console.log(`[SUBTITLE] Media not found`);
             return res.status(404).json({ error: "Media not found" });
         }
 
+        // 1. Check for extracted VTT (*_ext.vtt)
+        const extFileName = getSubsFileName(requestedFile, lang, "_ext");
+        const extVttPath = path.join(subsDir, extFileName);
         try {
-            await fs.access(vttPath);
-            console.log(`[SUBTITLE] Returning cached VTT: ${vttPath}`);
-            return res.sendFile(vttPath);
-        } catch {
-            console.log(
-                `[SUBTITLE] VTT not cached, fetching from OpenSubtitles...`,
-            );
+            await fs.access(extVttPath);
+            console.log(`[SUBTITLE] Returning extracted VTT: ${extVttPath}`);
+            return res.sendFile(extVttPath);
+        } catch {}
+
+        // 2. Check for already-fetched/cached VTT (no _ext suffix)
+        const cacheFileName = getSubsFileName(requestedFile, lang);
+        const cacheVttPath = path.join(subsDir, cacheFileName);
+        try {
+            await fs.access(cacheVttPath);
+            console.log(`[SUBTITLE] Returning cached VTT: ${cacheVttPath}`);
+            return res.sendFile(cacheVttPath);
+        } catch {}
+
+        // 3. Check legacy lowercase subs/ path (backward compat)
+        let legacyVttPath = null;
+        let relativePath = requestedFile;
+        if (relativePath.startsWith('/media/')) {
+            relativePath = relativePath.replace('/media/', '/');
         }
+        const withoutFile = path.dirname(relativePath);
+        const legacySubs = path.join(MEDIA_PATH, withoutFile, "subs");
+        const legacyFileName = getSubsFileName(requestedFile, lang);
+        legacyVttPath = path.join(legacySubs, legacyFileName);
+        try {
+            await fs.access(legacyVttPath);
+            console.log(`[SUBTITLE] Returning legacy VTT: ${legacyVttPath}`);
+            return res.sendFile(legacyVttPath);
+        } catch {}
+
+        // 4. Fallback to OpenSubtitles
+        console.log(`[SUBTITLE] VTT not cached, fetching from OpenSubtitles...`);
 
         const tmdbId = id.replace(/^(movie|tv)-/, "");
         const isTvShow = id.startsWith("tv-");
@@ -709,7 +755,8 @@ app.get("/api/subtitles/:id", async (req, res) => {
         );
         console.log(`[SUBTITLE] Got subtitle URL: ${subtitleUrl}`);
 
-        const savedPath = await downloadAndConvertToVTT(subtitleUrl, vttPath);
+        await fs.mkdir(subsDir, { recursive: true });
+        const savedPath = await downloadAndConvertToVTT(subtitleUrl, cacheVttPath);
         console.log(`[SUBTITLE] Saved and returning: ${savedPath}`);
 
         res.sendFile(savedPath);
@@ -728,28 +775,9 @@ app.get("/api/subtitles-available/:id", async (req, res) => {
         console.log(
             `[SUBTITLE] /api/subtitles-available/${id}?file=${requestedFile}`,
         );
-        const langs = ["en", "fr"];
-        const available = [];
 
-        for (const lang of langs) {
-            const vttPath = await getSubtitleCachePath(id, lang, requestedFile);
-
-            if (vttPath) {
-                try {
-                    await fs.access(vttPath);
-                    console.log(
-                        `[SUBTITLE] Found cached VTT for ${lang}: ${vttPath}`,
-                    );
-                    available.push({ lang, cached: true });
-                } catch {
-                    console.log(`[SUBTITLE] No subtitle for ${lang}`);
-                    available.push({ lang, cached: false });
-                }
-            } else {
-                console.log(`[SUBTITLE] No path found for ${lang}`);
-                available.push({ lang, cached: false });
-            }
-        }
+        const subtitles = await getAvailableSubtitles(requestedFile);
+        const available = subtitles.map(s => ({ lang: s.lang, cached: true }));
 
         console.log(`[SUBTITLE] Returning available:`, available);
         res.json(available);

@@ -33,11 +33,33 @@ interface SeasonInfo {
     episodes: EpisodeInfo[];
 }
 
-const API_BASE = "http://192.168.5.67";
+const API_BASE = import.meta.env.VITE_API_URL || "http://192.168.5.67:3000";
 
 const LANG_LABELS: Record<string, string> = {
     en: "English",
     fr: "French",
+    jpn: "Japanese",
+    de: "German",
+    es: "Spanish",
+    it: "Italian",
+    pt: "Portuguese",
+    ru: "Russian",
+    zh: "Chinese",
+    ko: "Korean",
+    ar: "Arabic",
+    nl: "Dutch",
+    pl: "Polish",
+    sv: "Swedish",
+    da: "Danish",
+    no: "Norwegian",
+    fi: "Finnish",
+    tr: "Turkish",
+    cs: "Czech",
+    hu: "Hungarian",
+    ro: "Romanian",
+    th: "Thai",
+    vi: "Vietnamese",
+    id: "Indonesian",
 };
 
 function parseEpisodeFromPath(filePath: string): EpisodeInfo | null {
@@ -116,13 +138,29 @@ export default function PlayerPage() {
                         const parsed = parseEpisodeFromPath(file);
                         if (parsed) setSelectedSeason(parsed.season);
                     } else if (organized.length > 0) {
-                        setSelectedSeason(organized[0].season);
-                        setSelectedVideo(organized[0].episodes[0].filePath);
+                        const saved = localStorage.getItem(`player-${id}-lastFile`);
+                        const match = saved && organized.some(s =>
+                            s.episodes.some(e => e.filePath === saved)
+                        );
+                        if (match) {
+                            setSelectedVideo(saved);
+                            const parsed = parseEpisodeFromPath(saved);
+                            if (parsed) setSelectedSeason(parsed.season);
+                        } else {
+                            setSelectedSeason(organized[0].season);
+                            setSelectedVideo(organized[0].episodes[0].filePath);
+                        }
                     }
                 }
             }
         });
     }, [id, file]);
+
+    useEffect(() => {
+        if (selectedVideo) {
+            localStorage.setItem(`player-${id}-lastFile`, selectedVideo);
+        }
+    }, [id, selectedVideo]);
 
     useEffect(() => {
         if (item && id && selectedVideo) {
@@ -138,15 +176,13 @@ export default function PlayerPage() {
                 .then((available) => {
                     const subs: ExternalSubtitle[] = [];
                     for (const sub of available) {
-                        if (sub.lang === "en" || sub.lang === "fr") {
-                            subs.push({
-                                lang: sub.lang,
-                                label:
-                                    LANG_LABELS[sub.lang] ||
-                                    sub.lang.toUpperCase(),
-                                src: `${API_BASE}/api/subtitles/${id}?lang=${sub.lang}&file=${fileParam}`,
-                            });
-                        }
+                        subs.push({
+                            lang: sub.lang,
+                            label:
+                                LANG_LABELS[sub.lang] ||
+                                sub.lang.toUpperCase(),
+                            src: `${API_BASE}/api/subtitles/${id}?lang=${sub.lang}&file=${fileParam}`,
+                        });
                     }
                     setExternalSubs(subs);
                 })
@@ -168,7 +204,6 @@ export default function PlayerPage() {
                 const player = new Plyr(video, {
                     captions: { active: false, update: true },
                     keyboard: { focused: true, global: false },
-                    storage: { enabled: false },
                     ratio: "16:9",
                     controls: [
                         "play-large",
