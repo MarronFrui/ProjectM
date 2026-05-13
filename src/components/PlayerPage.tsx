@@ -3,6 +3,7 @@ import { useEffect, useLayoutEffect, useState, useRef } from "react";
 import { loadContentDB, ContentItem } from "../../config";
 import { useDirectionalNavigation } from "../../hooks/useDirectionalNavigation";
 import Plyr from "plyr";
+import ASS from "assjs";
 
 interface AudioTrack {
     track: number;
@@ -19,6 +20,7 @@ interface ExternalSubtitle {
     lang: string;
     label: string;
     src: string;
+    format: "vtt" | "ass";
 }
 
 interface EpisodeInfo {
@@ -60,6 +62,31 @@ const LANG_LABELS: Record<string, string> = {
     th: "Thai",
     vi: "Vietnamese",
     id: "Indonesian",
+    el: "Greek",
+    lt: "Lithuanian",
+    bg: "Bulgarian",
+    sr: "Serbian",
+    sk: "Slovak",
+    sl: "Slovenian",
+    et: "Estonian",
+    lv: "Latvian",
+    uk: "Ukrainian",
+    he: "Hebrew",
+    hi: "Hindi",
+    ms: "Malay",
+    is: "Icelandic",
+    fa: "Persian",
+    hr: "Croatian",
+    ca: "Catalan",
+    gl: "Galician",
+    eu: "Basque",
+    hy: "Armenian",
+    ka: "Georgian",
+    kk: "Kazakh",
+    yi: "Yiddish",
+    sq: "Albanian",
+    my: "Burmese",
+    cy: "Welsh",
 };
 
 function parseEpisodeFromPath(filePath: string): EpisodeInfo | null {
@@ -110,13 +137,17 @@ export default function PlayerPage() {
     const [selectedSeason, setSelectedSeason] = useState<number | null>(null);
     const [selectedVideo, setSelectedVideo] = useState<string | null>(null);
     const [audioTracks, setAudioTracks] = useState<Tracks | null>(null);
-    const [externalSubs, setExternalSubs] = useState<ExternalSubtitle[]>([]);
+    const [subtitleTracks, setSubtitleTracks] = useState<ExternalSubtitle[]>([]);
+    const assLangsRef = useRef<Set<string>>(new Set());
+    const [selectedAssLang, setSelectedAssLang] = useState<string | null>(null);
     const [selectedAudio, setSelectedAudio] = useState("0");
     const [showTrackMenu, setShowTrackMenu] = useState(false);
     const navigate = useNavigate();
     const { register, focusFirst } = useDirectionalNavigation();
     const videoRef = useRef<HTMLVideoElement>(null);
     const playerRef = useRef<Plyr | null>(null);
+    const assContainerRef = useRef<HTMLDivElement>(null);
+    const assInstancesRef = useRef<ASS[]>([]);
 
     const isTvShow = item?.seasons !== null;
     const hasMultipleVideos =
@@ -158,17 +189,41 @@ export default function PlayerPage() {
             fetch(`${API_BASE}/api/subtitles-available/${id}?file=${fileParam}`)
                 .then((r) => r.json())
                 .then((available) => {
-                    const subs: ExternalSubtitle[] = [];
+                    const byLang: Record<string, typeof available> = {};
                     for (const sub of available) {
-                        subs.push({
-                            lang: sub.lang,
-                            label:
-                                LANG_LABELS[sub.lang] ||
-                                sub.lang.toUpperCase(),
-                            src: `${API_BASE}/api/subtitles/${id}?lang=${sub.lang}&file=${fileParam}`,
-                        });
+                        if (!byLang[sub.lang]) byLang[sub.lang] = [];
+                        byLang[sub.lang].push(sub);
                     }
-                    setExternalSubs(subs);
+
+                    const tracks: ExternalSubtitle[] = [];
+                    const assLangs = new Set<string>();
+                    for (const [lang, entries] of Object.entries(byLang)) {
+                        const assEntry = entries.find((e: any) => (e.format || "vtt") === "ass");
+                        if (assEntry) {
+                            assLangs.add(lang);
+                            tracks.push({
+                                lang,
+                                label: LANG_LABELS[lang] || lang.toUpperCase(),
+                                src: `${API_BASE}/api/subtitles/${id}?lang=${lang}&file=${fileParam}&track=true`,
+                                format: "ass",
+                            });
+                        } else {
+                            const vttEntries = entries.filter((e: any) => (e.format || "vtt") === "vtt");
+                            vttEntries.forEach((_entry: any, i: number) => {
+                                const label = i === 0
+                                    ? (LANG_LABELS[lang] || lang.toUpperCase())
+                                    : `${LANG_LABELS[lang] || lang.toUpperCase()} (${i + 1})`;
+                                tracks.push({
+                                    lang,
+                                    label,
+                                    src: `${API_BASE}/api/subtitles/${id}?lang=${lang}&file=${fileParam}`,
+                                    format: "vtt",
+                                });
+                            });
+                        }
+                    }
+                    setSubtitleTracks(tracks);
+                    assLangsRef.current = assLangs;
                 })
                 .catch(console.error);
         }
@@ -189,6 +244,7 @@ export default function PlayerPage() {
                     captions: { active: false, update: true },
                     keyboard: { focused: true, global: false },
                     ratio: "16:9",
+                    fullscreen: { container: '.videoplayer-wrapper' },
                     controls: [
                         "play-large",
                         "play",
@@ -200,6 +256,15 @@ export default function PlayerPage() {
                         "settings",
                         "fullscreen",
                     ],
+                });
+
+                player.on('languagechange', () => {
+                    const lang = (player as any).language;
+                    if (lang && assLangsRef.current.has(lang)) {
+                        setSelectedAssLang(lang);
+                    } else {
+                        setSelectedAssLang(null);
+                    }
                 });
 
                 playerRef.current = player;
@@ -218,10 +283,40 @@ export default function PlayerPage() {
         };
     }, [item, selectedAudio, selectedVideo]);
 
+    const containerKey = `${id}-${selectedVideo}`;
+
+    useEffect(() => {
+        assInstancesRef.current.forEach(a => a.destroy());
+        assInstancesRef.current = [];
+
+        if (!selectedAssLang || !videoRef.current || !assContainerRef.current) return;
+
+        const video = videoRef.current;
+        const container = assContainerRef.current;
+        const fileParam = selectedVideo ? encodeURIComponent(selectedVideo) : "";
+        const assSrc = `${API_BASE}/api/subtitles/${id}?lang=${selectedAssLang}&file=${fileParam}`;
+        let active = true;
+
+        fetch(assSrc)
+            .then(r => r.text())
+            .then(content => {
+                if (!active) return;
+                const ass = new ASS(content, video, { container });
+                ass.show();
+                assInstancesRef.current.push(ass);
+            })
+            .catch(console.error);
+
+        return () => {
+            active = false;
+            assInstancesRef.current.forEach(a => a.destroy());
+            assInstancesRef.current = [];
+        };
+    }, [selectedAssLang, containerKey]);
+
     if (!item) return <div>Loading...</div>;
 
     const fileParam = selectedVideo ? encodeURIComponent(selectedVideo) : "";
-    const containerKey = `${id}-${selectedVideo}`;
     const streamUrl = `${API_BASE}/stream/${id}?audio=${selectedAudio}${selectedVideo ? `&file=${fileParam}` : ""}`;
 
     const currentSeason = seasons.find((s) => s.season === selectedSeason);
@@ -252,18 +347,21 @@ export default function PlayerPage() {
 
             {item.available ? (
                 <div className="videoplayer-container" key={containerKey}>
-                    <video ref={videoRef} className="videoplayer" autoPlay>
-                        <source src={streamUrl} type="video/mp4" />
-                        {externalSubs.map((sub) => (
-                            <track
-                                key={sub.lang}
-                                kind="subtitles"
-                                src={sub.src}
-                                srcLang={sub.lang}
-                                label={sub.label}
-                            />
-                        ))}
-                    </video>
+                    <div className="videoplayer-wrapper">
+                        <video ref={videoRef} className="videoplayer" autoPlay>
+                            <source src={streamUrl} type="video/mp4" />
+                            {subtitleTracks.map((sub) => (
+                                <track
+                                    key={`${sub.lang}-${sub.label}`}
+                                    kind="subtitles"
+                                    src={sub.src}
+                                    srcLang={sub.lang}
+                                    label={sub.label}
+                                />
+                            ))}
+                        </video>
+                        <div ref={assContainerRef} className="ass-overlay" />
+                    </div>
                 </div>
             ) : (
                 <p style={{ marginLeft: "2rem" }}>No media file available.</p>

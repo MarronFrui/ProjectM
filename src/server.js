@@ -439,6 +439,16 @@ const LANG_3LETTER = {
 const LANG_2LETTER = Object.fromEntries(
     Object.entries(LANG_3LETTER).map(([k, v]) => [v, k])
 );
+// ISO 639-2/B codes (OpenSubtitles uses these)
+Object.assign(LANG_2LETTER, {
+    fre: "fr", ger: "de", gre: "el", ita: "it",
+    chi: "zh", dut: "nl", rum: "ro", cze: "cs",
+    per: "fa", slo: "sk", lit: "lt", ice: "is",
+    may: "ms", arm: "hy", geo: "ka", hin: "hi",
+    hrv: "hr", heb: "he", lav: "lv", slv: "sl",
+    ukr: "uk", cat: "ca", glg: "gl", baq: "eu",
+    bur: "my", wel: "cy", yid: "yi", alb: "sq",
+});
 
 function getSubsFileName(requestedFile, lang, suffix = "") {
     const episodeId = getEpisodeIdFromPath(requestedFile);
@@ -454,7 +464,8 @@ async function getAvailableSubtitles(requestedFile) {
         .filter((v, i, a) => a.indexOf(v) === i);
 
     const subtitles = [];
-    const seen = new Set();
+    const seenFiles = new Set();
+    const targetEpisode = getEpisodeIdFromPath(requestedFile);
 
     for (const subsDir of dirs) {
         try {
@@ -466,14 +477,20 @@ async function getAvailableSubtitles(requestedFile) {
         try {
             const files = await fs.readdir(subsDir);
             for (const file of files) {
-                const match = file.match(/(?:S\d+E\d+_)?([a-z]{2,3})(?:_\d+)?(?:_ext)?\.(vtt|ass)$/i);
+                const match = file.match(/(?:S(\d+E\d+)_)?([a-z]{2,3})(?:_(\d+))?(?:_ext)?\.(vtt|ass)$/i);
                 if (match) {
-                    let lang = match[1].toLowerCase();
+                    const fileEpisode = match[1] ? `S${match[1].toUpperCase()}` : null;
+                    if (targetEpisode && fileEpisode && fileEpisode !== targetEpisode) continue;
+
+                    if (seenFiles.has(file)) continue;
+                    seenFiles.add(file);
+
+                    const format = match[4];
+                    let lang = match[2].toLowerCase();
                     lang = LANG_2LETTER[lang] || lang;
-                    if (!seen.has(lang)) {
-                        seen.add(lang);
-                        subtitles.push({ lang, file });
-                    }
+                    const streamIdx = match[3] || "";
+
+                    subtitles.push({ lang, file, format, streamIdx });
                 }
             }
         } catch {}
@@ -680,6 +697,7 @@ async function findSubtitleFile(requestedFile, lang) {
         .filter((v, i, a) => a.indexOf(v) === i);
     const lang3 = LANG_3LETTER[lang] || lang;
     const targets = new Set([lang, lang3]);
+    const targetEpisode = getEpisodeIdFromPath(requestedFile);
 
     for (const dir of dirs) {
         try {
@@ -690,9 +708,12 @@ async function findSubtitleFile(requestedFile, lang) {
 
         const files = await fs.readdir(dir);
         for (const file of files) {
-            const match = file.match(/(?:S\d+E\d+_)?([a-z]{2,3})(?:_\d+)?(?:_ext)?\.(vtt|ass)$/i);
+            const match = file.match(/(?:S(\d+E\d+)_)?([a-z]{2,3})(?:_\d+)?(?:_ext)?\.(vtt|ass)$/i);
             if (match) {
-                const fileLang = LANG_2LETTER[match[1].toLowerCase()] || match[1].toLowerCase();
+                const fileEpisode = match[1] ? `S${match[1].toUpperCase()}` : null;
+                if (targetEpisode && fileEpisode && fileEpisode !== targetEpisode) continue;
+
+                const fileLang = LANG_2LETTER[match[2].toLowerCase()] || match[2].toLowerCase();
                 if (targets.has(fileLang)) {
                     return path.join(dir, file);
                 }
@@ -707,12 +728,12 @@ app.get("/api/subtitles/:id", async (req, res) => {
         const { id } = req.params;
         const lang = req.query.lang || "en";
         const requestedFile = req.query.file || null;
+        const isTrack = req.query.track === "true";
         console.log(
-            `[SUBTITLE] /api/subtitles/${id}?lang=${lang}&file=${requestedFile}`,
+            `[SUBTITLE] /api/subtitles/${id}?lang=${lang}&file=${requestedFile}${isTrack ? '&track=true' : ''}`,
         );
 
         res.setHeader("Access-Control-Allow-Origin", "*");
-        res.setHeader("Content-Type", "text/vtt");
 
         if (!requestedFile) {
             console.log(`[SUBTITLE] Media not found`);
@@ -721,9 +742,18 @@ app.get("/api/subtitles/:id", async (req, res) => {
 
         const foundPath = await findSubtitleFile(requestedFile, lang);
         if (foundPath) {
-            console.log(`[SUBTITLE] Returning VTT: ${foundPath}`);
+            const isAss = foundPath.endsWith(".ass");
+            if (isAss && isTrack) {
+                res.setHeader("Content-Type", "text/vtt");
+                console.log(`[SUBTITLE] Returning empty VTT for ASS track: ${foundPath}`);
+                return res.send("WEBVTT\n\n");
+            }
+            res.setHeader("Content-Type", isAss ? "text/plain; charset=utf-8" : "text/vtt");
+            console.log(`[SUBTITLE] Returning ${isAss ? "ASS" : "VTT"}: ${foundPath}`);
             return res.sendFile(foundPath);
         }
+
+        res.setHeader("Content-Type", "text/vtt");
 
         console.log(`[SUBTITLE] VTT not cached, fetching from OpenSubtitles...`);
 
@@ -804,13 +834,12 @@ app.get("/api/subtitles-available/:id", async (req, res) => {
         );
 
         const subtitles = await getAvailableSubtitles(requestedFile);
-        const available = subtitles.map(s => ({ lang: s.lang, cached: true }));
-        const seen = new Set(available.map(s => s.lang));
+        const available = subtitles.map(s => ({ lang: s.lang, cached: true, format: s.format, streamIdx: s.streamIdx }));
 
         const DEFAULT_LANGS = ["en", "fr"];
         for (const lang of DEFAULT_LANGS) {
-            if (!seen.has(lang)) {
-                available.push({ lang, cached: false });
+            if (!available.some(s => s.lang === lang && s.format === "vtt")) {
+                available.push({ lang, cached: false, format: "vtt" });
             }
         }
 

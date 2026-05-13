@@ -422,10 +422,25 @@ a {
 
 .videoplayer {
     display: block;
-    width: auto;
+    width: 100%;
     aspect-ratio: 16 / 9;
     border-radius: 12px;
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+}
+
+.videoplayer-wrapper {
+    position: relative;
+    width: 100%;
+}
+
+.ass-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    overflow: hidden;
 }
 
 .plyr__controls {
@@ -433,8 +448,8 @@ a {
     bottom: 0.5rem;
 }
 
-.plyr__menu__content {
-    max-height: 50vh;
+.plyr__menu__container [id$="-captions"] > [role="menu"] {
+    max-height: 300px;
     overflow-y: auto;
 }
 
