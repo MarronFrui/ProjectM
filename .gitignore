@@ -6,3 +6,4 @@ content-info
 .env
 .env.production
 srt-to-vtt.js
+node_modules

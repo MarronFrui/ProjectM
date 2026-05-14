@@ -270,6 +270,7 @@ export default function PlayerPage() {
         if (!item || !videoRef.current) return;
 
         const video = videoRef.current;
+        let onCaptionsDisabled: (() => void) | undefined;
 
         const handleCanPlay = () => {
             if (!playerRef.current) {
@@ -310,6 +311,11 @@ export default function PlayerPage() {
                     }
                 });
 
+                onCaptionsDisabled = () => {
+                    assInstancesRef.current.forEach(a => a.hide());
+                };
+                video.addEventListener('captionsdisabled', onCaptionsDisabled);
+
                 playerRef.current = player;
                 console.log("[PLYR] Initialized");
             }
@@ -323,6 +329,7 @@ export default function PlayerPage() {
                 playerRef.current = null;
             }
             video.removeEventListener("canplay", handleCanPlay);
+            if (onCaptionsDisabled) video.removeEventListener('captionsdisabled', onCaptionsDisabled);
         };
     }, [item, selectedAudio, selectedVideo]);
 

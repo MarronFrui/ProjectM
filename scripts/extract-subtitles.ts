@@ -186,7 +186,7 @@ async function processMkvFile(mkvPath: string, fileIndex: number, totalFiles: nu
 
         const isAss = stream.codec === "ass" || stream.codec === "ssa";
         const outputExt = isAss ? "ass" : "vtt";
-        outputFileName = `${outputFileName}_ext.${outputExt}`;
+        outputFileName = `${outputFileName}.${outputExt}`;
 
         const outputPath = path.join(subsDir, outputFileName);
 
