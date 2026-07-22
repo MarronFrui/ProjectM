@@ -60,38 +60,41 @@ There are **no tests** (`npm test` is a placeholder) and no linter configured.
 - `apikey.json`: TMDB key (`{"API_KEY": "..."}`) — used by `scraper.ts` and `src/server.js`
 - `apikeyOMDb.json`: OMDb key
 
-## Gotchas
+## Gotchas — intended homelab coupling
+
+This is a single-machine homelab deployment, not a portable product. The hardcoded
+paths/hosts/toolchain below are **intentional** — do not refactor them for
+portability or "fix" them as if they were bugs:
 
 - Media library path `/mnt/media` is hardcoded in `src/server.js` and `scripts/convert-videos.ts`
-- Maintenance scripts log to hardcoded `/home/marron/ProjectM/logs/` (differs from this repo path)
+- Maintenance scripts log to `/home/marron/ProjectM/logs/` (intended; just ensure the dir exists)
 - `scripts/extract-subtitles.ts` uses `ffmpeg.exe` and WSL→Windows path conversion (designed to run under WSL)
-- `scripts/sync-subtitles.ts` rsyncs over SSH to a hardcoded host (`192.168.5.67`, overridable via `SSH_HOST`)
+- `scripts/sync-subtitles.ts` rsyncs over SSH to host `192.168.5.67` (overridable via `SSH_HOST`)
+- Server reads config only from `../.env` via a hand-rolled parser (fine while that file exists)
+- No on-the-fly transcoding: `/stream/:id` always serves the **original** file as-is (browser compatibility is handled offline by `scripts/convert-videos.ts`); subtitles are a separate layer (extraction scripts + SRT→VTT conversion + ASS via assjs)
 
 ## To do — known issues (diagnosed 2026-07-22)
 
 ### Critical — security
 
-- [ ] Path traversal in `/stream/:id`, `/media/:id`, `/api/tracks/:id` (`src/server.js:113-116`): `normalizeMediaPath()` doesn't sanitize `..`; add a `safeJoin()` that resolves and asserts the result stays under `MEDIA_PATH`
-- [ ] Path traversal write in `/api/subtitles/:id` (`src/server.js:726-826`): `?file=` and `?lang=` flow unsanitized into `path.join` + `mkdir` + write; validate `lang` against `/^[a-z]{2,3}$/` and DB-validate `id` for movies too
-- [ ] No authentication on any endpoint + wide-open CORS (`app.use(cors())`, line 11): verify Supabase JWT server-side, restrict CORS to the frontend origin
+- [x] ~~Path traversal in `/stream/:id`, `/media/:id`, `/api/tracks/:id`~~ — fixed 2026-07-22: `safeJoin()` rejects paths escaping `MEDIA_PATH` (residual: symlinks inside `/mnt/media` pointing outside are not detected)
+- [x] ~~Path traversal write in `/api/subtitles/:id`~~ — fixed 2026-07-22: subs dirs go through `safeJoin()`, `lang` whitelisted to `/^[a-z]{2,3}$/`, `id` validated as `movie|tv-<digits>`
+- [ ] No authentication on any endpoint: verify Supabase JWT server-side (CORS restricted to frontend origin 2026-07-22; remaining hole = anyone who can reach port 3000 directly, e.g. LAN/curl)
 
 ### Critical — build
 
 - [ ] `vite`, `typescript`, `@vitejs/plugin-react` missing from `package.json` **and** lockfile — fresh clone cannot `dev`/`build`; add them to devDependencies
 - [ ] `"start:server": "node server.js"` points at a nonexistent root file; fix to `node src/server.js`
 
-### Critical — player
-
-- [ ] Switching audio track permanently breaks the player (`PlayerPage.tsx:269-336`): effect cleanup destroys Plyr but `<video>` never remounts (`containerKey` excludes `selectedAudio`) and `video.load()` is never called
-
 ### High
 
 - [ ] `loadContentWithPaths()` rescans the whole library per request (every Range chunk!); add caching with TTL/mtime invalidation (`src/server.js:213-239`)
-- [ ] Missing `'error'` handlers crash the process: video read stream (`server.js:362`), ffprobe child (`server.js:289`), `res.download` callback writing after headers sent (`server.js:260-265`)
-- [ ] Unauthenticated OpenSubtitles downloads with arbitrary `?lang=` cache keys → quota/disk abuse; gate behind auth + lang whitelist
+- [x] ~~Missing `'error'` handlers crash the process~~ — fixed 2026-07-22: video read stream, ffprobe child, and `res.download` callback all guarded (plus stream destroy on client disconnect)
+- [ ] Unauthenticated OpenSubtitles downloads → quota abuse; gate behind auth (lang whitelist in place since 2026-07-22, so cache-key spray is limited to ~17k valid codes)
 - [ ] Scraper data loss (`scraper.ts`): poster/metadata use bare numeric TMDB id → `movie-123`/`tv-123` overwrite each other (lines 185/198); corrupt-DB `catch {}` then overwrite (lines 26-31); non-atomic full-DB rewrite per item (line 226); transient network errors permanently blacklist items via `skipped.txt` (lines 228-232)
 - [ ] `scripts/convert-videos.ts` data loss: no `-map 0` → drops extra audio/sub tracks; `<basename>.mp4` collisions + `-y` + delete-original-on-success overwrite/destroy files
-- [ ] 6,651 `node_modules/` files committed to git; remove from tracking; also gitignore `.env.local` / `.env.*.local`
+- [x] 6,651 `node_modules/` files committed to git — untracked 2026-07-22 (still present in old history commits)
+- [ ] Add `.env.local` / `.env.*.local` to `.gitignore`
 - [ ] TMDB API key leaks into logs on fetch failure (`scraper.ts:49` includes `?api_key=` in the error URL)
 - [ ] `.env.production` defines `API_URL` but `PlayerPage.tsx:39` reads `VITE_URL` → player broken in prod builds; unify env var names + validate at startup
 - [ ] Wishlist is dead: `WatchlistProvider` never mounted, `WishlistPage` always empty; mount the provider or delete the feature
@@ -99,6 +102,7 @@ There are **no tests** (`npm test` is a placeholder) and no linter configured.
 
 ### Medium
 
+- [ ] Audio-track selection is **dropped** but the code is still live and must be stripped: `PlayerPage.tsx` keeps `selectedAudio` state, renders the audio menu (lines 430-450) and appends `?audio=N` to the stream URL — which the server **ignores** (`/stream/:id` never reads it; the original file streams as-is, so the browser always plays the default audio track). Switching tracks also destroys Plyr without recreating it. Remove the menu/state/param (optionally keep `/api/tracks/:id` ffprobe listing for a future remux-based implementation)
 - [ ] Range handling (`server.js:350-363`): clamp `end` to `fileSize-1`, return 416 for invalid/suffix ranges, use per-extension `Content-Type` (not hardcoded `video/mp4`)
 - [ ] Route shadowing: `/media/:id` registered before `express.static` (`server.js:241` vs 272) — reorder/reconcile
 - [ ] Subtitle matching bugs: unpadded `S1E2` never matches; `NNxNN` filenames unparsed; `(year)` in folder names breaks OpenSubtitles filtering; case-sensitive `.ass`/`.vtt` checks; episode-less sub files served for every episode
@@ -107,10 +111,9 @@ There are **no tests** (`npm test` is a placeholder) and no linter configured.
 - [ ] Item-load effect has no race guard or error handling (`PlayerPage.tsx:156-178`)
 - [ ] Directional nav `preventDefault()`s all arrow keys before checking focus — breaks page scroll & radio inputs (`useDirectionalNavigation.ts:172-179`)
 - [ ] CardsGrid: virtualization range never shrinks → blank grid after category switch; search-after-scroll registers shifted col indices (`CardsGrid.tsx:38-72`)
-- [ ] Scripts: hardcoded log path `/home/marron/ProjectM/logs/` doesn't exist (logs silently lost); `extract-subtitles.ts` is WSL-only (`ffmpeg.exe`); shell-injection-prone path interpolation; convert-videos re-encodes already-h264 video lossily (use `-c:v copy` when possible)
+- [ ] Scripts: shell-injection-prone path interpolation (`extract-subtitles.ts:97,205,212`, `sync-subtitles.ts:82,105`, `convert-videos.ts:58-60`); convert-videos re-encodes already-h264 video lossily (use `-c:v copy` when possible)
 - [ ] Relative `href="style.css"` breaks on nested routes (`index.html:7` → `/style.css`); Plyr CSS loaded from CDN instead of the installed npm package
 - [ ] No typecheck ever runs (`typescript` not installed, no script); strict-mode errors already exist (e.g. `convert-videos.ts:70-71`)
-- [ ] Server `.env` parser reads only `../.env`, ignores real env vars and `.env.production` (`server.js:16-33`) — use `dotenv`
 
 ### Low
 
@@ -119,3 +122,4 @@ There are **no tests** (`npm test` is a placeholder) and no linter configured.
 - [ ] No fetch timeouts (server + frontend); unbounded `episodeNameCache`; OpenSubtitles download tokens logged; JSON errors served as `Content-Type: text/vtt`
 - [ ] `parseEpisodeFromPath` fabricates "S1E1" for unmatched files; ASS subtitles fetched twice; `navigate(-1)` back buttons break on direct loads
 - [ ] README is empty
+- [ ] Optional: replace hand-rolled `.env` parser (`server.js:16-33`) with `dotenv` so real env vars and `.env.production` are honored — homelab `.env` file works fine as-is

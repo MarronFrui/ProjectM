@@ -8,7 +8,28 @@ import { spawn } from "child_process";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
-app.use(cors());
+
+// Origins allowed to read API responses from a browser (override with ALLOWED_ORIGINS env var)
+const ALLOWED_ORIGINS = (
+    process.env.ALLOWED_ORIGINS ||
+    "http://192.168.5.67,http://192.168.5.67:5173,http://localhost:5173"
+)
+    .split(",")
+    .map((o) => o.trim())
+    .filter(Boolean);
+
+app.use(
+    cors({
+        origin: (origin, callback) => {
+            // No Origin header = same-origin nav, curl, server-to-server — allow
+            if (!origin || ALLOWED_ORIGINS.includes(origin)) {
+                return callback(null, true);
+            }
+            // Unknown origin: omit CORS headers so the browser blocks the response
+            callback(null, false);
+        },
+    }),
+);
 
 const MEDIA_PATH = "/mnt/media";
 const DB_PATH = path.resolve(__dirname, "../content-info/contentDB.json");
@@ -113,6 +134,14 @@ function matches(file, itemName) {
 function normalizeMediaPath(requestedFile) {
     if (!requestedFile) return null;
     return requestedFile.replace(/^\/media\//, "");
+}
+
+// Resolve userPath inside base, rejecting anything that escapes base (path traversal)
+function safeJoin(base, userPath) {
+    if (!userPath) return null;
+    const resolved = path.resolve(base, userPath);
+    if (resolved !== base && !resolved.startsWith(base + path.sep)) return null;
+    return resolved;
 }
 
 async function scanMediaFolder(folderPath, isTvShow) {
@@ -248,19 +277,21 @@ app.get("/media/:id", async (req, res) => {
 
         let fullPath;
         if (requestedFile) {
-            fullPath = path.join(MEDIA_PATH, normalizeMediaPath(requestedFile));
+            fullPath = safeJoin(MEDIA_PATH, normalizeMediaPath(requestedFile));
+            if (!fullPath) return res.status(403).send("Invalid file path");
         } else {
             if (!item.mediaFiles || item.mediaFiles.videos.length === 0)
                 return res.status(404).send("No video file found");
 
             const videoPath = item.mediaFiles.videos[0];
-            fullPath = path.join(MEDIA_PATH, normalizeMediaPath(videoPath));
+            fullPath = safeJoin(MEDIA_PATH, normalizeMediaPath(videoPath));
+            if (!fullPath) return res.status(404).send("No video file found");
         }
 
         res.download(fullPath, (err) => {
             if (err) {
                 console.error("Error sending file:", err);
-                res.status(500).send("Error sending file");
+                if (!res.headersSent) res.status(500).send("Error sending file");
             }
         });
     } catch (err) {
@@ -277,17 +308,18 @@ async function getVideoPath(itemId, requestedFile = null) {
     if (!item) return null;
 
     if (requestedFile) {
-        return path.join(MEDIA_PATH, normalizeMediaPath(requestedFile));
+        return safeJoin(MEDIA_PATH, normalizeMediaPath(requestedFile));
     }
 
     if (!item.mediaFiles || item.mediaFiles.videos.length === 0) return null;
 
     const videoPath = item.mediaFiles.videos[0];
-    return path.join(MEDIA_PATH, normalizeMediaPath(videoPath));
+    return safeJoin(MEDIA_PATH, normalizeMediaPath(videoPath));
 }
 
 async function getTrackInfo(itemId, requestedFile = null) {
     const videoPath = await getVideoPath(itemId, requestedFile);
+    if (!videoPath) return null;
 
     return new Promise((resolve) => {
         const ffprobe = spawn("ffprobe", [
@@ -298,6 +330,11 @@ async function getTrackInfo(itemId, requestedFile = null) {
             "-show_streams",
             videoPath,
         ]);
+
+        ffprobe.on("error", (err) => {
+            console.error("[TRACKS] ffprobe failed:", err.message);
+            resolve(null);
+        });
 
         let data = "";
         ffprobe.stdout.on("data", (chunk) => (data += chunk));
@@ -360,6 +397,15 @@ app.get("/stream/:id", async (req, res) => {
             res.setHeader("Content-Type", "video/mp4");
 
             const stream = fsSync.createReadStream(videoPath, { start, end });
+            stream.on("error", (err) => {
+                console.error("[STREAM] Read error:", err.message);
+                if (!res.headersSent) {
+                    res.status(500).send("Error reading file");
+                } else {
+                    res.socket.destroy();
+                }
+            });
+            res.on("close", () => stream.destroy());
             stream.pipe(res);
         } else {
             res.setHeader("Accept-Ranges", "bytes");
@@ -413,8 +459,9 @@ function getSubsDirPath(requestedFile) {
     if (relativePath.startsWith('/media/')) {
         relativePath = relativePath.replace('/media/', '/');
     }
-    const withoutFile = path.dirname(relativePath);
-    return path.join(MEDIA_PATH, withoutFile, "subs");
+    const withoutFile = path.dirname(relativePath).replace(/^\/+/, "");
+    const base = safeJoin(MEDIA_PATH, withoutFile);
+    return base ? path.join(base, "subs") : null;
 }
 
 function getUpperSubsDir(requestedFile) {
@@ -423,8 +470,9 @@ function getUpperSubsDir(requestedFile) {
     if (relativePath.startsWith('/media/')) {
         relativePath = relativePath.replace('/media/', '/');
     }
-    const withoutFile = path.dirname(relativePath);
-    return path.join(MEDIA_PATH, withoutFile, "Subs");
+    const withoutFile = path.dirname(relativePath).replace(/^\/+/, "");
+    const base = safeJoin(MEDIA_PATH, withoutFile);
+    return base ? path.join(base, "Subs") : null;
 }
 
 const LANG_3LETTER = {
@@ -726,14 +774,18 @@ async function findSubtitleFile(requestedFile, lang) {
 app.get("/api/subtitles/:id", async (req, res) => {
     try {
         const { id } = req.params;
-        const lang = req.query.lang || "en";
+        if (!/^(movie|tv)-\d+$/.test(id)) {
+            return res.status(400).json({ error: "Invalid content id" });
+        }
+        const lang = (req.query.lang || "en").toLowerCase();
+        if (!/^[a-z]{2,3}$/.test(lang)) {
+            return res.status(400).json({ error: "Invalid language code" });
+        }
         const requestedFile = req.query.file || null;
         const isTrack = req.query.track === "true";
         console.log(
             `[SUBTITLE] /api/subtitles/${id}?lang=${lang}&file=${requestedFile}${isTrack ? '&track=true' : ''}`,
         );
-
-        res.setHeader("Access-Control-Allow-Origin", "*");
 
         if (!requestedFile) {
             console.log(`[SUBTITLE] Media not found`);
@@ -808,8 +860,12 @@ app.get("/api/subtitles/:id", async (req, res) => {
         );
         console.log(`[SUBTITLE] Got subtitle URL: ${subtitleUrl}`);
 
+        const subsDir = getSubsDirPath(requestedFile);
+        if (!subsDir) {
+            return res.status(403).json({ error: "Invalid file path" });
+        }
         const cacheVttPath = path.join(
-            getSubsDirPath(requestedFile),
+            subsDir,
             getSubsFileName(requestedFile, lang)
         );
         await fs.mkdir(path.dirname(cacheVttPath), { recursive: true });
