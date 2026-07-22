@@ -10,7 +10,7 @@ const MEDIA_PATH = "/mnt/media";
 const VIDEO_EXTENSIONS = [".mkv", ".avi", ".mov", ".webm"];
 const CONCURRENT = 2;
 
-const BROWSER_VIDEO_CODECS = ['h264', 'hevc', 'vp9', 'av1'];
+const BROWSER_VIDEO_CODECS = ['h264', 'vp9', 'av1'];
 const BROWSER_AUDIO_CODECS = ['aac', 'mp3', 'opus'];
 const LOG_FILE = "/home/marron/ProjectM/logs/conversion.log";
 
