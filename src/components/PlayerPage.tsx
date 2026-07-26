@@ -96,7 +96,7 @@ function parseEpisodeFromPath(filePath: string): EpisodeInfo | null {
     let season = 1;
     let episode = 1;
 
-    const sMatch = fileName.match(/[Ss](\d{1,2})[Ee](\d{1,2})/);
+    const sMatch = fileName.match(/[Ss](\d{1,2})[Ee](\d{1,3})/);
     if (sMatch) {
         season = parseInt(sMatch[1], 10);
         episode = parseInt(sMatch[2], 10);

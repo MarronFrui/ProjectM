@@ -435,7 +435,7 @@ async function getMediaFolderPath(itemId, requestedFile = null) {
 function getSeasonAndEpisode(filePath) {
     if (!filePath) return null;
     const fileName = filePath.split("/").pop() || "";
-    const match = fileName.match(/[Ss](\d{1,2})[Ee](\d{1,2})/);
+    const match = fileName.match(/[Ss](\d{1,2})[Ee](\d{1,3})/);
     if (match) {
         return {
             season: parseInt(match[1], 10),
@@ -451,6 +451,14 @@ function getEpisodeIdFromPath(filePath) {
         return `S${String(se.season).padStart(2, "0")}E${String(se.episode).padStart(2, "0")}`;
     }
     return null;
+}
+
+// Canonical numeric form so S1E2 / S01E02 / S01E002 all compare equal
+function normalizeEpisodeId(id) {
+    if (!id) return null;
+    const match = id.match(/S(\d+)E(\d+)/i);
+    if (!match) return null;
+    return `S${parseInt(match[1], 10)}E${parseInt(match[2], 10)}`;
 }
 
 function getSubsDirPath(requestedFile) {
@@ -513,7 +521,7 @@ async function getAvailableSubtitles(requestedFile) {
 
     const subtitles = [];
     const seenFiles = new Set();
-    const targetEpisode = getEpisodeIdFromPath(requestedFile);
+    const targetEpisode = normalizeEpisodeId(getEpisodeIdFromPath(requestedFile));
 
     for (const subsDir of dirs) {
         try {
@@ -527,7 +535,7 @@ async function getAvailableSubtitles(requestedFile) {
             for (const file of files) {
                 const match = file.match(/(?:S(\d+E\d+)_)?([a-z]{2,3})(?:_(\d+))?(?:_ext)?\.(vtt|ass)$/i);
                 if (match) {
-                    const fileEpisode = match[1] ? `S${match[1].toUpperCase()}` : null;
+                    const fileEpisode = match[1] ? normalizeEpisodeId(`S${match[1]}`) : null;
                     if (targetEpisode && fileEpisode && fileEpisode !== targetEpisode) continue;
 
                     if (seenFiles.has(file)) continue;
@@ -553,7 +561,7 @@ function buildSearchQuery(filePath) {
 
     const showName = parts[2] || "";
 
-    const episodeMatch = fileName.match(/[Ss](\d{1,2})[Ee](\d{1,2})/);
+    const episodeMatch = fileName.match(/[Ss](\d{1,2})[Ee](\d{1,3})/);
     if (!episodeMatch) return null;
 
     const episode = `S${episodeMatch[1].padStart(2, "0")}E${episodeMatch[2].padStart(2, "0")}`;
@@ -745,7 +753,7 @@ async function findSubtitleFile(requestedFile, lang) {
         .filter((v, i, a) => a.indexOf(v) === i);
     const lang3 = LANG_3LETTER[lang] || lang;
     const targets = new Set([lang, lang3]);
-    const targetEpisode = getEpisodeIdFromPath(requestedFile);
+    const targetEpisode = normalizeEpisodeId(getEpisodeIdFromPath(requestedFile));
 
     for (const dir of dirs) {
         try {
@@ -758,7 +766,7 @@ async function findSubtitleFile(requestedFile, lang) {
         for (const file of files) {
             const match = file.match(/(?:S(\d+E\d+)_)?([a-z]{2,3})(?:_\d+)?(?:_ext)?\.(vtt|ass)$/i);
             if (match) {
-                const fileEpisode = match[1] ? `S${match[1].toUpperCase()}` : null;
+                const fileEpisode = match[1] ? normalizeEpisodeId(`S${match[1]}`) : null;
                 if (targetEpisode && fileEpisode && fileEpisode !== targetEpisode) continue;
 
                 const fileLang = LANG_2LETTER[match[2].toLowerCase()] || match[2].toLowerCase();

@@ -27,7 +27,7 @@ async function logResult(status: string, file: string, message?: string): Promis
 
 function getEpisodeIdFromFilename(filePath: string): string | null {
     const fileName = path.basename(filePath);
-    const match = fileName.match(/[Ss](\d{1,2})[Ee](\d{1,2})/);
+    const match = fileName.match(/[Ss](\d{1,2})[Ee](\d{1,3})/);
     if (match) {
         return `S${String(match[1]).padStart(2, "0")}E${String(match[2]).padStart(2, "0")}`;
     }
@@ -199,13 +199,15 @@ async function processMkvFile(mkvPath: string, fileIndex: number, totalFiles: nu
         const winInputPath = toWindowsPath(mkvPath);
         const winOutputPath = toWindowsPath(outputPath);
 
+        let tempSrtPath: string | null = null;
+
         try {
             if (isAss) {
                 await execAsync(
                     `timeout ${TIMEOUT_SECONDS} "${FFMPEG_EXE}" -i "${winInputPath}" -map 0:${stream.streamIndex} -c:s copy "${winOutputPath}" -y`,
                 );
             } else {
-                const tempSrtPath = path.join(mkvDir, `temp_${Date.now()}.srt`);
+                tempSrtPath = path.join(mkvDir, `temp_${Date.now()}.srt`);
                 const winTempSrtPath = toWindowsPath(tempSrtPath);
 
                 await execAsync(
@@ -221,6 +223,7 @@ async function processMkvFile(mkvPath: string, fileIndex: number, totalFiles: nu
                 } catch {
                     console.log(`  [FAIL] ${outputFileName}: SRT extraction failed`);
                     await logResult("ERROR", baseName, `Failed: ${outputFileName} - SRT extraction failed`);
+                    await fs.unlink(tempSrtPath).catch(() => {});
                     continue;
                 }
             }
@@ -237,6 +240,7 @@ async function processMkvFile(mkvPath: string, fileIndex: number, totalFiles: nu
         } catch (err) {
             console.log(`  [FAIL] ${outputFileName}: ${(err as Error).message}`);
             await logResult("ERROR", baseName, `Failed: ${outputFileName} - ${(err as Error).message}`);
+            if (tempSrtPath) await fs.unlink(tempSrtPath).catch(() => {});
         }
     }
 
