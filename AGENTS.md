@@ -20,7 +20,7 @@ OpenSubtitles.
 | `npm run start:server` | Express media/API server (`node server.js` — see note below) |
 | `npm run scrape:db` | TMDB scraper: builds `content-info/contentDB.json` + posters |
 | `npm run convert:videos` | Transcode non-browser-compatible videos in `/mnt/media` via ffmpeg |
-| `npm run extract:sub` | Extract embedded subtitles from MKV files |
+| `npm run extract:sub` | Extract embedded subtitles from MKV files (text → VTT, ASS copied, PGS bitmap → OCR) |
 
 Note: `start:server` runs `node server.js` but the server lives at `src/server.js`
 (run `node src/server.js` from the repo root). Both the dev frontend and the server
@@ -68,7 +68,7 @@ portability or "fix" them as if they were bugs:
 
 - Media library path `/mnt/media` is hardcoded in `src/server.js` and `scripts/convert-videos.ts`
 - Maintenance scripts log to `/home/marron/ProjectM/logs/` (intended; just ensure the dir exists)
-- `scripts/extract-subtitles.ts` uses `ffmpeg.exe` and WSL→Windows path conversion (designed to run under WSL)
+- `scripts/extract-subtitles.ts` uses `ffmpeg.exe` and WSL→Windows path conversion (designed to run under WSL); PGS (`hdmv_pgs_subtitle`) tracks are extracted to `.sup` then OCR'd via repo-local tooling (gitignored): `pgsrip` in `.venv/` + tesseract 4.1.1 in `.tools/` (wrapper `.tools/bin/tesseract` sets `LD_LIBRARY_PATH`/`TESSDATA_PREFIX`; the script injects it into `PATH`). Only `eng.traineddata` is installed — other languages need more traineddata files. pgsrip needs the language as a 2-letter code in the temp `.sup` filename (3-letter codes hit a path-translation bug)
 - `scripts/sync-subtitles.ts` rsyncs over SSH to host `192.168.5.67` (overridable via `SSH_HOST`)
 - Server reads config only from `../.env` via a hand-rolled parser (fine while that file exists)
 - No on-the-fly transcoding: `/stream/:id` always serves the **original** file as-is (browser compatibility is handled offline by `scripts/convert-videos.ts`); subtitles are a separate layer (extraction scripts + SRT→VTT conversion + ASS via assjs)
@@ -92,7 +92,7 @@ portability or "fix" them as if they were bugs:
 - [x] ~~Missing `'error'` handlers crash the process~~ — fixed 2026-07-22: video read stream, ffprobe child, and `res.download` callback all guarded (plus stream destroy on client disconnect)
 - [ ] Unauthenticated OpenSubtitles downloads → quota abuse; gate behind auth (lang whitelist in place since 2026-07-22, so cache-key spray is limited to ~17k valid codes)
 - [ ] Scraper data loss (`scraper.ts`): poster/metadata use bare numeric TMDB id → `movie-123`/`tv-123` overwrite each other (lines 185/198); corrupt-DB `catch {}` then overwrite (lines 26-31); non-atomic full-DB rewrite per item (line 226); transient network errors permanently blacklist items via `skipped.txt` (lines 228-232)
-- [ ] `scripts/convert-videos.ts` data loss: no `-map 0` → drops extra audio/sub tracks; `<basename>.mp4` collisions + `-y` + delete-original-on-success overwrite/destroy files
+- [x] ~~`scripts/convert-videos.ts` data loss~~ — fixed 2026-07-27: maps `0:v:0` + all audio tracks (`-map 0:a?`, dual-audio preserved; embedded subs/attachments intentionally dropped since VTTs are external), forces `-pix_fmt yuv420p` (10-bit sources → browser-decodable 8-bit H.264), originals kept by default (`DELETE_ORIGINAL=1` to opt in). Residual: `<basename>.mp4` collisions + `-y` can still overwrite an existing mp4
 - [x] 6,651 `node_modules/` files committed to git — untracked 2026-07-22 (still present in old history commits)
 - [ ] Add `.env.local` / `.env.*.local` to `.gitignore`
 - [ ] TMDB API key leaks into logs on fetch failure (`scraper.ts:49` includes `?api_key=` in the error URL)
@@ -105,7 +105,7 @@ portability or "fix" them as if they were bugs:
 - [ ] Audio-track selection is **dropped** but the code is still live and must be stripped: `PlayerPage.tsx` keeps `selectedAudio` state, renders the audio menu (lines 430-450) and appends `?audio=N` to the stream URL — which the server **ignores** (`/stream/:id` never reads it; the original file streams as-is, so the browser always plays the default audio track). Switching tracks also destroys Plyr without recreating it. Remove the menu/state/param (optionally keep `/api/tracks/:id` ffprobe listing for a future remux-based implementation)
 - [ ] Range handling (`server.js:350-363`): clamp `end` to `fileSize-1`, return 416 for invalid/suffix ranges, use per-extension `Content-Type` (not hardcoded `video/mp4`)
 - [ ] Route shadowing: `/media/:id` registered before `express.static` (`server.js:241` vs 272) — reorder/reconcile
-- [ ] Subtitle matching bugs: ~~unpadded `S1E2` never matches~~ — fixed 2026-07-26: sub-file ↔ video episode comparison now goes through `normalizeEpisodeId()` (numeric, padding-insensitive) and `SxxEyy` regexes accept 3-digit episodes (`S01E001`) in `server.js`, `PlayerPage.tsx`, `extract-subtitles.ts`. Remaining: `NNxNN` filenames unparsed; `(year)` in folder names breaks OpenSubtitles filtering; case-sensitive `.ass`/`.vtt` checks; episode-less sub files served for every episode. Note: PGS (`hdmv_pgs_subtitle`) tracks can't be extracted by `extract-subtitles.ts` (bitmap, needs OCR) — e.g. the Judas HxH 2011 release on `F:\Movies`
+- [ ] Subtitle matching bugs: ~~unpadded `S1E2` never matches~~ — fixed 2026-07-26: sub-file ↔ video episode comparison now goes through `normalizeEpisodeId()` (numeric, padding-insensitive) and `SxxEyy` regexes accept 3-digit episodes (`S01E001`) in `server.js`, `PlayerPage.tsx`, `extract-subtitles.ts`. Remaining: `NNxNN` filenames unparsed; `(year)` in folder names breaks OpenSubtitles filtering; case-sensitive `.ass`/`.vtt` checks; episode-less sub files served for every episode
 - [ ] Fuzzy `matches()` (60% word overlap, first-match-wins) mismatches one-word titles nondeterministically (`server.js:102-111`)
 - [ ] Stale subtitle `<track>`s leak into next episode's `<video>` — reset `subtitleTracks`/`audioTracks` in effect cleanup (`PlayerPage.tsx:258-262`)
 - [ ] Item-load effect has no race guard or error handling (`PlayerPage.tsx:156-178`)

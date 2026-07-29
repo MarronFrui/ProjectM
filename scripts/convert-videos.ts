@@ -6,9 +6,11 @@ import { exec } from "child_process";
 
 const execAsync = promisify(exec);
 
-const MEDIA_PATH = "/mnt/media";
+const MEDIA_PATH = process.env.MEDIA_PATH || "/mnt/media";
 const VIDEO_EXTENSIONS = [".mkv", ".avi", ".mov", ".webm"];
 const CONCURRENT = 2;
+// Originals are kept by default; set DELETE_ORIGINAL=1 to remove sources after success
+const DELETE_ORIGINAL = process.env.DELETE_ORIGINAL === "1";
 
 const BROWSER_VIDEO_CODECS = ['h264', 'vp9', 'av1'];
 const BROWSER_AUDIO_CODECS = ['aac', 'mp3', 'opus'];
@@ -93,12 +95,22 @@ function convertVideo(inputPath: string): Promise<void> {
             "4", // Half cores for parallel processing
             "-i",
             inputPath,
+            // First video stream + ALL audio tracks (dual-audio releases);
+            // embedded subs/attachments are dropped (external VTTs are used)
+            "-map",
+            "0:v:0",
+            "-map",
+            "0:a?",
             "-c:v",
             "libx264",
             "-preset",
             "fast",
             "-crf",
             "23",
+            // Force 8-bit output: 10-bit sources would otherwise produce
+            // Hi10P H.264, which browsers can't decode either
+            "-pix_fmt",
+            "yuv420p",
             "-c:a",
             "aac",
             "-b:a",
@@ -142,12 +154,14 @@ function convertVideo(inputPath: string): Promise<void> {
             // Log success
             await logResult('SUCCESS', path.basename(inputPath), 'Converted to MP4');
 
-            // Delete original .mkv after successful conversion
-            try {
-                await fs.unlink(inputPath);
-                console.log(`  🗑️  Deleted original: ${path.basename(inputPath)}`);
-            } catch (err) {
-                console.error(`  ⚠️  Failed to delete original: ${err}`);
+            // Delete original .mkv after successful conversion (opt-in)
+            if (DELETE_ORIGINAL) {
+                try {
+                    await fs.unlink(inputPath);
+                    console.log(`  🗑️  Deleted original: ${path.basename(inputPath)}`);
+                } catch (err) {
+                    console.error(`  ⚠️  Failed to delete original: ${err}`);
+                }
             }
 
             resolve();

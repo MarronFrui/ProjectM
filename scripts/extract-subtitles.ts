@@ -2,12 +2,27 @@ import fs from "fs/promises";
 import path from "path";
 import { exec } from "child_process";
 import { promisify } from "util";
+import { fileURLToPath } from "url";
 
 const execAsync = promisify(exec);
 
 const FFMPEG_EXE = "ffmpeg.exe";
 const TIMEOUT_SECONDS = 120;
 const LOG_FILE = "/home/marron/ProjectM/logs/extract-subtitles.log";
+
+// PGS (bitmap) subtitles can't be converted by ffmpeg: extract to .sup,
+// then OCR to text with pgsrip (tesseract). Both live in the repo (.venv/.tools).
+const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const PGSRIP_EXE = path.join(REPO_ROOT, ".venv", "bin", "pgsrip");
+const TESSERACT_BIN_DIR = path.join(REPO_ROOT, ".tools", "bin");
+const OCR_TIMEOUT_SECONDS = 900;
+
+// pgsrip requires a language code in the .sup filename and behaves best with ISO-2
+const LANG_3TO2: Record<string, string> = {
+    eng: "en", jpn: "ja", fra: "fr", fre: "fr", deu: "de", ger: "de",
+    spa: "es", ita: "it", por: "pt", rus: "ru", zho: "zh", chi: "zh",
+    kor: "ko", ara: "ar", nld: "nl", dut: "nl", pol: "pl", swe: "sv",
+};
 
 interface SubtitleStream {
     streamIndex: string;
@@ -185,6 +200,7 @@ async function processMkvFile(mkvPath: string, fileIndex: number, totalFiles: nu
         }
 
         const isAss = stream.codec === "ass" || stream.codec === "ssa";
+        const isPgs = stream.codec === "hdmv_pgs_subtitle";
         const outputExt = isAss ? "ass" : "vtt";
         outputFileName = `${outputFileName}.${outputExt}`;
 
@@ -199,15 +215,39 @@ async function processMkvFile(mkvPath: string, fileIndex: number, totalFiles: nu
         const winInputPath = toWindowsPath(mkvPath);
         const winOutputPath = toWindowsPath(outputPath);
 
-        let tempSrtPath: string | null = null;
+        const tempFiles: string[] = [];
 
         try {
             if (isAss) {
                 await execAsync(
                     `timeout ${TIMEOUT_SECONDS} "${FFMPEG_EXE}" -i "${winInputPath}" -map 0:${stream.streamIndex} -c:s copy "${winOutputPath}" -y`,
                 );
+            } else if (isPgs) {
+                const lang2 = LANG_3TO2[lang] || lang;
+                const tempSupPath = path.join(mkvDir, `temp_${Date.now()}_${i}.${lang2}.sup`);
+                const tempPgsSrtPath = tempSupPath.replace(/\.sup$/, ".srt");
+                tempFiles.push(tempSupPath, tempPgsSrtPath);
+
+                await execAsync(
+                    `timeout ${TIMEOUT_SECONDS} "${FFMPEG_EXE}" -i "${winInputPath}" -map 0:${stream.streamIndex} -c:s copy "${toWindowsPath(tempSupPath)}" -y`,
+                );
+
+                await execAsync(
+                    `timeout ${OCR_TIMEOUT_SECONDS} "${PGSRIP_EXE}" -l ${lang2} "${tempSupPath}"`,
+                    {
+                        env: { ...process.env, PATH: `${TESSERACT_BIN_DIR}${path.delimiter}${process.env.PATH}` },
+                        maxBuffer: 16 * 1024 * 1024,
+                    },
+                );
+
+                const srtContent = await fs.readFile(tempPgsSrtPath, "utf-8");
+                const vttContent = srtToVtt(srtContent);
+                await fs.writeFile(outputPath, vttContent, "utf-8");
+                await fs.unlink(tempSupPath).catch(() => {});
+                await fs.unlink(tempPgsSrtPath).catch(() => {});
             } else {
-                tempSrtPath = path.join(mkvDir, `temp_${Date.now()}.srt`);
+                const tempSrtPath = path.join(mkvDir, `temp_${Date.now()}_${i}.srt`);
+                tempFiles.push(tempSrtPath);
                 const winTempSrtPath = toWindowsPath(tempSrtPath);
 
                 await execAsync(
@@ -240,7 +280,7 @@ async function processMkvFile(mkvPath: string, fileIndex: number, totalFiles: nu
         } catch (err) {
             console.log(`  [FAIL] ${outputFileName}: ${(err as Error).message}`);
             await logResult("ERROR", baseName, `Failed: ${outputFileName} - ${(err as Error).message}`);
-            if (tempSrtPath) await fs.unlink(tempSrtPath).catch(() => {});
+            for (const tempFile of tempFiles) await fs.unlink(tempFile).catch(() => {});
         }
     }
 
