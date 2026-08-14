@@ -1,7 +1,8 @@
 import { useParams, useNavigate } from "react-router-dom";
 import { useEffect, useLayoutEffect, useState, useRef, useCallback } from "react";
-import { loadContentDB, ContentItem } from "../../config";
+import { ContentItem } from "../../config";
 import { useDirectionalNavigation } from "../../hooks/useDirectionalNavigation";
+import { useContent } from "./ContentProvider";
 import Plyr from "plyr";
 import ASS from "assjs";
 
@@ -194,6 +195,7 @@ function organizeBySeasons(videos: string[]): SeasonInfo[] {
 
 export default function PlayerPage() {
     const { id, file } = useParams();
+    const { content } = useContent();
     const [item, setItem] = useState<ContentItem | null>(null);
     const [seasons, setSeasons] = useState<SeasonInfo[]>([]);
     const [selectedSeason, setSelectedSeason] = useState<number | null>(null);
@@ -231,28 +233,26 @@ export default function PlayerPage() {
         seasons.length > 1 || seasons.some((s) => s.episodes.length > 1);
 
     useEffect(() => {
-        loadContentDB().then((db) => {
-            const found = db.find((x) => x.id === id);
-            if (found) {
-                setItem(found);
-                const mf = (found as any).mediaFiles;
+        const found = content.find((x) => x.id === id);
+        if (found) {
+            setItem(found);
+            const mf = (found as any).mediaFiles;
 
-                if (mf?.videos?.length) {
-                    const organized = organizeBySeasons(mf.videos);
-                    setSeasons(organized);
+            if (mf?.videos?.length) {
+                const organized = organizeBySeasons(mf.videos);
+                setSeasons(organized);
 
-                    if (file) {
-                        setSelectedVideo(file);
-                        const parsed = parseEpisodeFromPath(file);
-                        if (parsed) setSelectedSeason(parsed.season);
-                    } else if (organized.length > 0) {
-                        setSelectedSeason(organized[0].season);
-                        setSelectedVideo(organized[0].episodes[0].filePath);
-                    }
+                if (file) {
+                    setSelectedVideo(file);
+                    const parsed = parseEpisodeFromPath(file);
+                    if (parsed) setSelectedSeason(parsed.season);
+                } else if (organized.length > 0) {
+                    setSelectedSeason(organized[0].season);
+                    setSelectedVideo(organized[0].episodes[0].filePath);
                 }
             }
-        });
-    }, [id, file]);
+        }
+    }, [id, file, content]);
 
     useEffect(() => {
         if (!item || !id || !selectedVideo) return;

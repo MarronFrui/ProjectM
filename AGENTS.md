@@ -106,6 +106,7 @@ portability or "fix" them as if they were bugs:
 ### High
 
 - [ ] `loadContentWithPaths()` rescans the whole library per request (every Range chunk!); add caching with TTL/mtime invalidation (`src/server.js:213-239`)
+- [x] ~~Frontend re-fetches `/api/content-availability` on every `HomePage` and `PlayerPage` mount~~ — fixed 2026-08-14: added `ContentProvider`/`useContent()`; `App.tsx` fetches once per SPA session and all pages consume the shared context, so React Router navigation no longer triggers refetches
 - [x] ~~Missing `'error'` handlers crash the process~~ — fixed 2026-07-22: video read stream, ffprobe child, and `res.download` callback all guarded (plus stream destroy on client disconnect)
 - [ ] Unauthenticated OpenSubtitles downloads → quota abuse; gate behind auth (lang whitelist in place since 2026-07-22, so cache-key spray is limited to ~17k valid codes)
 - [ ] Scraper data loss (`scraper.ts`): poster/metadata use bare numeric TMDB id → `movie-123`/`tv-123` overwrite each other (lines 185/198); corrupt-DB `catch {}` then overwrite (lines 26-31); non-atomic full-DB rewrite per item (line 226); transient network errors permanently blacklist items via `skipped.txt` (lines 228-232)
@@ -114,7 +115,7 @@ portability or "fix" them as if they were bugs:
 - [x] ~~Add `.env.local` / `.env.*.local` to `.gitignore`~~ — fixed 2026-08-14
 - [ ] TMDB API key leaks into logs on fetch failure (`scraper.ts:49` includes `?api_key=` in the error URL)
 - [ ] `.env.production` defines `API_URL` but `PlayerPage.tsx:39` reads `VITE_URL` → player broken in prod builds; unify env var names + validate at startup
-- [ ] Wishlist is dead: `WatchlistProvider` never mounted, `WishlistPage` always empty; mount the provider or delete the feature
+- [ ] Wishlist is dead: `WatchlistProvider` never mounted, `WishlistPage` always empty; mount the provider or delete the feature. Additionally, `HomePage.tsx` keeps its own local `wishlist` state and passes it to `CardsGrid`/`PreviewModal`, so toggles are lost on navigation and are not shared with `WishlistPage` even if the provider were mounted
 - [ ] Auth gates nothing: no route checks `useAuth()`; protect routes or drop the login flow
 
 ### Medium

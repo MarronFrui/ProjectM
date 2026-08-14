@@ -1,10 +1,11 @@
 import { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { loadContentDB, ContentItem } from "../../config";
 import { useDirectionalNavigation } from "../../hooks/useDirectionalNavigation";
+import { useContent } from "./ContentProvider";
 
 export default function CategoryPage() {
     const [genres, setGenres] = useState<string[]>([]);
+    const { content } = useContent();
     const navigate = useNavigate();
     const { register, focusFirst } = useDirectionalNavigation();
     const cardRefs = useRef<(HTMLElement | null)[]>([]);
@@ -39,18 +40,12 @@ export default function CategoryPage() {
     };
 
     useEffect(() => {
-        async function fetchGenres() {
-            const items: ContentItem[] = await loadContentDB();
+        const allGenres = Array.from(
+            new Set(content.flatMap((item) => item.category)),
+        ).sort();
 
-            const allGenres = Array.from(
-                new Set(items.flatMap((item) => item.category)),
-            ).sort();
-
-            setGenres(allGenres);
-        }
-
-        fetchGenres();
-    }, []);
+        setGenres(allGenres);
+    }, [content]);
 
     useEffect(() => {
         if (genres.length > 0) {

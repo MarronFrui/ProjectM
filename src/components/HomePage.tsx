@@ -1,14 +1,15 @@
 import { useParams, useNavigate } from "react-router-dom";
 import { useEffect, useState, useRef } from "react";
-import { loadContentDB, ContentItem } from "../../config";
+import { ContentItem } from "../../config";
 import CardsGrid from "./CardsGrid";
 import PreviewModal from "./PreviewModal";
 import Menu from "../components/Menu";
 import { useDirectionalNavigation } from "../../hooks/useDirectionalNavigation";
 import { useAuth } from "./AuthProvider";
+import { useContent } from "./ContentProvider";
 
 export default function HomePage() {
-    const [content, setContent] = useState<ContentItem[]>([]);
+    const { content } = useContent();
     const [search, setSearch] = useState("");
     const [selected, setSelected] = useState<ContentItem | null>(null);
     const [wishlist, setWishlist] = useState<string[]>([]);
@@ -52,18 +53,6 @@ export default function HomePage() {
     const CARD_ROWS = 2;
     const availableRowCount = available.length > 0 ? CARD_ROWS : 0;
     const unavailableBaseRow = 1 + availableRowCount;
-
-useEffect(() => {
-    loadContentDB()
-        .then((items) => {
-            setContent(items);
-        })
-        .catch((err) => {
-            console.error("Failed to load contentDB.json", err);
-            setContent([]);
-        });
-}, []);
-
 
     const hasInitialized = useRef(false);
 
