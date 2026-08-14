@@ -409,7 +409,9 @@ export default function PlayerPage() {
 
                 // Subtitle size controls (A− / A+), injected next to settings.
                 // Plyr 3.8 ignores custom HTML in `controls`, so insert them
-                // into the built control bar directly.
+                // into the built control bar directly. The settings button is
+                // wrapped in a .plyr__menu container, so insert before that
+                // wrapper rather than the button itself.
                 const { elements } = player as unknown as PlyrInternals;
                 applySubtitleZoom(
                     elements.container,
@@ -428,9 +430,13 @@ export default function PlayerPage() {
                         () => changeSubtitleZoom(1),
                     );
                     const settingsButton = elements.buttons.settings;
-                    if (settingsButton) {
-                        controlsBar.insertBefore(zoomOut, settingsButton);
-                        controlsBar.insertBefore(zoomIn, settingsButton);
+                    const settingsWrapper = settingsButton?.parentElement;
+                    if (
+                        settingsWrapper &&
+                        settingsWrapper.parentElement === controlsBar
+                    ) {
+                        controlsBar.insertBefore(zoomOut, settingsWrapper);
+                        controlsBar.insertBefore(zoomIn, settingsWrapper);
                     } else {
                         controlsBar.append(zoomOut, zoomIn);
                     }
@@ -441,6 +447,9 @@ export default function PlayerPage() {
             }
         };
 
+        if (video.readyState >= HTMLMediaElement.HAVE_FUTURE_DATA) {
+            handleCanPlay();
+        }
         video.addEventListener("canplay", handleCanPlay);
 
         return () => {
