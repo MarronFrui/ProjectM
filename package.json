@@ -2,21 +2,22 @@
   "name": "homemade-netflix",
   "version": "1.0.0",
   "description": "Homemade Netflix",
-  "main": "index.js",
+  "main": "src/server.js",
   "type": "module",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/MarronFrui/ProjectM.git"
   },
   "scripts": {
-    "test": "test",
+    "test": "echo 'No tests configured' && exit 0",
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite build",
+    "preview": "vite preview",
     "scrape:db": "tsx ./scraper.ts",
-    "start:server": "node server.js",
+    "start:server": "node src/server.js",
     "convert:videos": "tsx ./scripts/convert-videos.ts",
-    "extract:sub": "tsx ./scripts/extract-subtitles.ts"
+    "extract:sub": "tsx ./scripts/extract-subtitles.ts",
+    "deploy": "npm run build && rsync -av --delete dist/ marron@192.168.5.67:/home/marron/ProjectM/dist/"
   },
   "author": "Marron",
   "license": "ISC",
@@ -31,7 +32,10 @@
     "@types/node": "^24.10.1",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
-    "tsx": "^4.20.6"
+    "@vitejs/plugin-react": "^6.0.5",
+    "tsx": "^4.20.6",
+    "typescript": "^7.0.2",
+    "vite": "^8.2.1"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.99.3",

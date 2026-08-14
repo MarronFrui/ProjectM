@@ -448,6 +448,14 @@ a {
     bottom: 0.5rem;
 }
 
+/* Subtitle zoom buttons (A− / A+), injected by PlayerPage */
+.plyr__control.subsize-btn {
+    font-weight: 700;
+    line-height: 1;
+    padding: 0 7px;
+    min-width: 30px;
+}
+
 .plyr__menu__container [id$="-captions"] > [role="menu"] {
     max-height: 300px;
     overflow-y: auto;

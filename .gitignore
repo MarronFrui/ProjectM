@@ -5,6 +5,8 @@ dist
 content-info
 .env
 .env.production
+.env.local
+.env.*.local
 srt-to-vtt.js
 node_modules/
 .venv/

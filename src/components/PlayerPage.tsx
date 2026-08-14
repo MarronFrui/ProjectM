@@ -1,5 +1,5 @@
 import { useParams, useNavigate } from "react-router-dom";
-import { useEffect, useLayoutEffect, useState, useRef } from "react";
+import { useEffect, useLayoutEffect, useState, useRef, useCallback } from "react";
 import { loadContentDB, ContentItem } from "../../config";
 import { useDirectionalNavigation } from "../../hooks/useDirectionalNavigation";
 import Plyr from "plyr";
@@ -90,6 +90,67 @@ const LANG_LABELS: Record<string, string> = {
     cy: "Welsh",
 };
 
+// --- Subtitle zoom (VTT only) ---------------------------------------------
+// Plyr renders VTT cues itself and sizes them from these CSS custom
+// properties, so scaling the vars on the player root zooms the captions
+// while preserving Plyr's responsive breakpoints. ASS subtitles render on
+// an assjs canvas and are intentionally not affected.
+const SUBTITLE_ZOOM_KEY = "subtitle-zoom";
+const SUBTITLE_ZOOM_MIN = 0.5;
+const SUBTITLE_ZOOM_MAX = 3;
+const SUBTITLE_ZOOM_FACTOR = 1.25;
+
+const PLYR_CAPTION_VARS: ReadonlyArray<readonly [string, number]> = [
+    ["--plyr-font-size-small", 13],
+    ["--plyr-font-size-base", 15],
+    ["--plyr-font-size-large", 18],
+    ["--plyr-font-size-xlarge", 21],
+];
+
+// Plyr's bundled d.ts doesn't expose `elements` with modern TS — type the
+// pieces we touch ourselves (same workaround as the `as any` captions
+// access in the languagechange handler below).
+interface PlyrInternals {
+    elements: {
+        container: HTMLElement | null;
+        controls: HTMLElement | null;
+        buttons: { settings?: HTMLButtonElement };
+    };
+}
+
+function loadSubtitleZoom(): number {
+    const saved = parseFloat(localStorage.getItem(SUBTITLE_ZOOM_KEY) ?? "");
+    if (!Number.isFinite(saved)) return 1;
+    return Math.min(SUBTITLE_ZOOM_MAX, Math.max(SUBTITLE_ZOOM_MIN, saved));
+}
+
+function applySubtitleZoom(container: HTMLElement | null, zoom: number) {
+    if (!container) return;
+    for (const [name, base] of PLYR_CAPTION_VARS) {
+        container.style.setProperty(name, `${Math.round(base * zoom)}px`);
+    }
+}
+
+function createZoomButton(
+    label: string,
+    tooltip: string,
+    onClick: () => void,
+): HTMLButtonElement {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "plyr__controls__item plyr__control subsize-btn";
+    button.setAttribute("aria-label", tooltip);
+    button.append(label);
+
+    const tip = document.createElement("span");
+    tip.className = "plyr__tooltip";
+    tip.textContent = tooltip;
+    button.appendChild(tip);
+
+    button.addEventListener("click", onClick);
+    return button;
+}
+
 function parseEpisodeFromPath(filePath: string): EpisodeInfo | null {
     const fileName = filePath.split("/").pop() || "";
 
@@ -148,6 +209,22 @@ export default function PlayerPage() {
     const assContainerRef = useRef<HTMLDivElement>(null);
     const assInstancesRef = useRef<Map<string, ASS>>(new Map());
     const subtitleTracksRef = useRef<ExternalSubtitle[]>([]);
+    const subtitleZoomRef = useRef(loadSubtitleZoom());
+
+    const changeSubtitleZoom = useCallback((direction: 1 | -1) => {
+        const scaled =
+            subtitleZoomRef.current *
+            (direction > 0 ? SUBTITLE_ZOOM_FACTOR : 1 / SUBTITLE_ZOOM_FACTOR);
+        const next = Math.min(
+            SUBTITLE_ZOOM_MAX,
+            Math.max(SUBTITLE_ZOOM_MIN, Math.round(scaled * 100) / 100),
+        );
+        if (next === subtitleZoomRef.current) return;
+        subtitleZoomRef.current = next;
+        localStorage.setItem(SUBTITLE_ZOOM_KEY, String(next));
+        const player = playerRef.current as unknown as PlyrInternals | null;
+        applySubtitleZoom(player?.elements.container ?? null, next);
+    }, []);
 
     const isTvShow = item?.seasons !== null;
     const hasMultipleVideos =
@@ -266,6 +343,20 @@ export default function PlayerPage() {
         if (item) requestAnimationFrame(focusFirst);
     }, [item]);
 
+    // +/- keyboard shortcuts for subtitle size
+    useEffect(() => {
+        const onKeyDown = (event: KeyboardEvent) => {
+            const tag = (event.target as HTMLElement | null)?.tagName;
+            if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT")
+                return;
+            if (event.key === "+" || event.key === "=") changeSubtitleZoom(1);
+            else if (event.key === "-" || event.key === "_")
+                changeSubtitleZoom(-1);
+        };
+        window.addEventListener("keydown", onKeyDown);
+        return () => window.removeEventListener("keydown", onKeyDown);
+    }, [changeSubtitleZoom]);
+
     useLayoutEffect(() => {
         if (!item || !videoRef.current) return;
 
@@ -315,6 +406,35 @@ export default function PlayerPage() {
                     assInstancesRef.current.forEach(a => a.hide());
                 };
                 video.addEventListener('captionsdisabled', onCaptionsDisabled);
+
+                // Subtitle size controls (A− / A+), injected next to settings.
+                // Plyr 3.8 ignores custom HTML in `controls`, so insert them
+                // into the built control bar directly.
+                const { elements } = player as unknown as PlyrInternals;
+                applySubtitleZoom(
+                    elements.container,
+                    subtitleZoomRef.current,
+                );
+                if (elements.controls) {
+                    const controlsBar = elements.controls;
+                    const zoomOut = createZoomButton(
+                        "A−",
+                        "Decrease subtitle size",
+                        () => changeSubtitleZoom(-1),
+                    );
+                    const zoomIn = createZoomButton(
+                        "A+",
+                        "Increase subtitle size",
+                        () => changeSubtitleZoom(1),
+                    );
+                    const settingsButton = elements.buttons.settings;
+                    if (settingsButton) {
+                        controlsBar.insertBefore(zoomOut, settingsButton);
+                        controlsBar.insertBefore(zoomIn, settingsButton);
+                    } else {
+                        controlsBar.append(zoomOut, zoomIn);
+                    }
+                }
 
                 playerRef.current = player;
                 console.log("[PLYR] Initialized");

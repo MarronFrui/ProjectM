@@ -17,14 +17,13 @@ OpenSubtitles.
 |---|---|
 | `npm run dev` | Vite dev server (frontend) |
 | `npm run build` | Production build to `dist/` |
-| `npm run start:server` | Express media/API server (`node server.js` — see note below) |
+| `npm run start:server` | Express media/API server (`node src/server.js`) |
 | `npm run scrape:db` | TMDB scraper: builds `content-info/contentDB.json` + posters |
 | `npm run convert:videos` | Transcode non-browser-compatible videos in `/mnt/media` via ffmpeg |
 | `npm run extract:sub` | Extract embedded subtitles from MKV files (text → VTT, ASS copied, PGS bitmap → OCR) |
 
-Note: `start:server` runs `node server.js` but the server lives at `src/server.js`
-(run `node src/server.js` from the repo root). Both the dev frontend and the server
-must run together (frontend calls the API via `VITE_API_URL` / `VITE_URL`).
+Both the dev frontend and the server must run together (frontend calls the API via
+`VITE_API_URL` / `VITE_URL`).
 
 There are **no tests** (`npm test` is a placeholder) and no linter configured.
 
@@ -60,6 +59,24 @@ There are **no tests** (`npm test` is a placeholder) and no linter configured.
 - `apikey.json`: TMDB key (`{"API_KEY": "..."}`) — used by `scraper.ts` and `src/server.js`
 - `apikeyOMDb.json`: OMDb key
 
+## Deployment (server: 192.168.5.67)
+
+The frontend is served statically from `/home/marron/ProjectM/dist` on
+`marron@192.168.5.67` (port 80; the Express API runs on port 3000). To deploy
+frontend changes, **build first** — the server only serves the built bundle,
+never the TS source:
+
+```bash
+npm run deploy  # builds dist/ and rsyncs it to the server
+```
+
+This runs `npm run build` (vite bakes `VITE_URL`/`VITE_API_URL` from `.env` into
+the bundle) and then `rsync -av --delete dist/ marron@192.168.5.67:/home/marron/ProjectM/dist/`.
+
+SSH is configured for key-based auth (`ssh-copy-id marron@192.168.5.67` has been
+set up), so the deploy is non-interactive. The Express API on port 3000 is not
+restarted by this script.
+
 ## Gotchas — intended homelab coupling
 
 This is a single-machine homelab deployment, not a portable product. The hardcoded
@@ -83,8 +100,8 @@ portability or "fix" them as if they were bugs:
 
 ### Critical — build
 
-- [ ] `vite`, `typescript`, `@vitejs/plugin-react` missing from `package.json` **and** lockfile — fresh clone cannot `dev`/`build`; add them to devDependencies
-- [ ] `"start:server": "node server.js"` points at a nonexistent root file; fix to `node src/server.js`
+- [x] ~~`vite`, `typescript`, `@vitejs/plugin-react` missing from `package.json`~~ — fixed 2026-08-14: added to `devDependencies`
+- [x] ~~`"start:server": "node server.js"` points at a nonexistent root file~~ — fixed 2026-08-14: changed to `node src/server.js`
 
 ### High
 
@@ -94,7 +111,7 @@ portability or "fix" them as if they were bugs:
 - [ ] Scraper data loss (`scraper.ts`): poster/metadata use bare numeric TMDB id → `movie-123`/`tv-123` overwrite each other (lines 185/198); corrupt-DB `catch {}` then overwrite (lines 26-31); non-atomic full-DB rewrite per item (line 226); transient network errors permanently blacklist items via `skipped.txt` (lines 228-232)
 - [x] ~~`scripts/convert-videos.ts` data loss~~ — fixed 2026-07-27: maps `0:v:0` + all audio tracks (`-map 0:a?`, dual-audio preserved; embedded subs/attachments intentionally dropped since VTTs are external), forces `-pix_fmt yuv420p` (10-bit sources → browser-decodable 8-bit H.264), originals kept by default (`DELETE_ORIGINAL=1` to opt in). Residual: `<basename>.mp4` collisions + `-y` can still overwrite an existing mp4
 - [x] 6,651 `node_modules/` files committed to git — untracked 2026-07-22 (still present in old history commits)
-- [ ] Add `.env.local` / `.env.*.local` to `.gitignore`
+- [x] ~~Add `.env.local` / `.env.*.local` to `.gitignore`~~ — fixed 2026-08-14
 - [ ] TMDB API key leaks into logs on fetch failure (`scraper.ts:49` includes `?api_key=` in the error URL)
 - [ ] `.env.production` defines `API_URL` but `PlayerPage.tsx:39` reads `VITE_URL` → player broken in prod builds; unify env var names + validate at startup
 - [ ] Wishlist is dead: `WatchlistProvider` never mounted, `WishlistPage` always empty; mount the provider or delete the feature
@@ -117,7 +134,8 @@ portability or "fix" them as if they were bugs:
 
 ### Low
 
-- [ ] `npm test` placeholder always fails; `"preview"` rebuilds instead of `vite preview`; `"main": "index.js"` nonexistent; unused `jsdom` deps
+- [x] ~~`npm test` placeholder always fails; `"preview"` rebuilds instead of `vite preview`; `"main": "index.js"` nonexistent~~ — fixed 2026-08-14
+- [ ] unused `jsdom` deps
 - [ ] `LoginPage` sends "Username" text field as `email:`; no redirect away from `/login` when authenticated
 - [ ] No fetch timeouts (server + frontend); unbounded `episodeNameCache`; OpenSubtitles download tokens logged; JSON errors served as `Content-Type: text/vtt`
 - [ ] `parseEpisodeFromPath` fabricates "S1E1" for unmatched files; ASS subtitles fetched twice; `navigate(-1)` back buttons break on direct loads
