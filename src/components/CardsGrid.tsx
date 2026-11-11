@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect } from "react";
 import { ContentItem } from "../../config";
 import Card from "./Card";
 
+const CARD_ROWS = 2;
 const COLS_VISIBLE = 10;
 const COLS_BUFFER = 2;
 const COLS_TOTAL = COLS_VISIBLE + COLS_BUFFER * 2;
@@ -31,15 +32,17 @@ export default function CardsGrid({
     baseRow,
     searchActive,
 }: Props) {
-    const CARD_ROWS = 2;
     const totalCols = Math.ceil(items.length / CARD_ROWS);
     const [range, setRange] = useState({ start: 0, end: 0 });
 
+    // Reset the virtualization window whenever the item list changes
+    // (category switch, search, …) so previously blank grids recover.
     useEffect(() => {
-        if (items.length > 0 && range.end === 0) {
-            setRange({ start: 0, end: Math.min(COLS_TOTAL, totalCols) });
-        }
-    }, [items.length]);
+        const end = Math.min(COLS_TOTAL, totalCols);
+        setRange((prev) =>
+            prev.start === 0 && prev.end === end ? prev : { start: 0, end },
+        );
+    }, [items, totalCols]);
 
     const onCardFocus = useCallback(
         (col: number) => {
@@ -60,14 +63,17 @@ export default function CardsGrid({
         [totalCols],
     );
 
+    // While searching, render everything and index columns absolutely;
+    // the virtualization window would otherwise shift the registered
+    // row/col coordinates and break arrow-key navigation.
     const visibleItems = searchActive
         ? items
         : items.slice(range.start * CARD_ROWS, range.end * CARD_ROWS);
 
     return (
-        <div className="card-container">
+        <div className="cards-row">
             {visibleItems.map((item, i) => {
-                const absoluteIndex = range.start * CARD_ROWS + i;
+                const absoluteIndex = searchActive ? i : range.start * CARD_ROWS + i;
                 const col = Math.floor(absoluteIndex / CARD_ROWS);
                 const row = (absoluteIndex % CARD_ROWS) + baseRow;
                 return (

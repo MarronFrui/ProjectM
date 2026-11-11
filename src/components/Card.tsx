@@ -1,5 +1,5 @@
-import { ContentItem } from "../../config";
-import { forwardRef } from "react";
+import { ContentItem, formatRuntime } from "../../config";
+import { forwardRef, KeyboardEvent } from "react";
 
 interface Props {
     item: ContentItem;
@@ -11,25 +11,65 @@ interface Props {
 
 const Card = forwardRef<HTMLDivElement, Props>(
     ({ item, onSelect, wishlist, toggleWishlist, onFocus }, ref) => {
+        const wished = wishlist.includes(item.id);
+
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                onSelect();
+            }
+        };
+
         return (
-            <div className="card" tabIndex={0} onClick={onSelect} onFocus={onFocus} ref={ref}>
-                <img src={item.poster} alt={item.name} />
-                <h3>{item.name}</h3>
-                <p>
-                    {item.seasons === null
-                        ? `${item.duration} min`
-                        : `Seasons: ${item.seasons} | Episodes: ${item.episodes}`}
-                </p>
-                {!item.available && (
-                    <button
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            toggleWishlist(item.id);
-                        }}
-                    >
-                        {wishlist.includes(item.id) ? "♥" : "♡"}
-                    </button>
-                )}
+            <div
+                className="card"
+                role="button"
+                tabIndex={0}
+                aria-label={`${item.name} — ${
+                    item.available ? "available" : "not available"
+                }`}
+                onClick={onSelect}
+                onKeyDown={handleKeyDown}
+                onFocus={onFocus}
+                ref={ref}
+            >
+                <div
+                    className={`card-poster${item.poster ? "" : " is-empty"}`}
+                >
+                    {item.poster ? (
+                        <img
+                            src={item.poster}
+                            alt=""
+                            loading="lazy"
+                            decoding="async"
+                        />
+                    ) : (
+                        <span>No poster available</span>
+                    )}
+                    {!item.available && (
+                        <span className="card-badge">Not available</span>
+                    )}
+                    {!item.available && (
+                        <button
+                            type="button"
+                            className={`heart-btn${wished ? " is-active" : ""}`}
+                            aria-pressed={wished}
+                            aria-label={
+                                wished
+                                    ? `Remove ${item.name} from wishlist`
+                                    : `Add ${item.name} to wishlist`
+                            }
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                toggleWishlist(item.id);
+                            }}
+                        >
+                            {wished ? "♥" : "♡"}
+                        </button>
+                    )}
+                </div>
+                <h3 className="card-title">{item.name}</h3>
+                <p className="card-meta">{formatRuntime(item)}</p>
             </div>
         );
     },

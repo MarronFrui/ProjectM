@@ -1,14 +1,16 @@
 import { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
+import NavBar from "./NavBar";
 import { useDirectionalNavigation } from "../../hooks/useDirectionalNavigation";
 import { useContent } from "./ContentProvider";
 
 export default function CategoryPage() {
     const [genres, setGenres] = useState<string[]>([]);
-    const { content } = useContent();
+    const { content, loading, error } = useContent();
     const navigate = useNavigate();
     const { register, focusFirst } = useDirectionalNavigation();
     const cardRefs = useRef<(HTMLElement | null)[]>([]);
+
     const recalcGrid = () => {
         const refs = cardRefs.current.filter(Boolean) as HTMLElement[];
         if (!refs.length) return;
@@ -34,7 +36,7 @@ export default function CategoryPage() {
             );
             els.forEach((el, colIndex) => {
                 const genre = el.dataset.genre!;
-                register(genre, el, rowIndex + 1, colIndex); // +1 keeps row 0 for back button
+                register(genre, el, rowIndex + 1, colIndex); // +1 keeps row 0 for the nav
             });
         });
     };
@@ -49,7 +51,8 @@ export default function CategoryPage() {
 
     useEffect(() => {
         if (genres.length > 0) {
-            setTimeout(focusFirst, 0);
+            const id = requestAnimationFrame(focusFirst);
+            return () => cancelAnimationFrame(id);
         }
     }, [genres]);
 
@@ -68,37 +71,69 @@ export default function CategoryPage() {
 
     return (
         <>
-            <header>
-                <h1>Select a Genre</h1>
-            </header>
+            <NavBar register={register} />
 
-            <button
-                id="back-button"
-                tabIndex={0}
-                ref={(el) => register(undefined, el, 0, 0)}
-                onClick={() => navigate(-1)}
-            >
-                ← Back
-            </button>
+            <main className="page">
+                <section className="section" aria-label="Genres">
+                    <h1 className="section-title">
+                        Browse by genre
+                        <span className="section-count">
+                            {genres.length}{" "}
+                            {genres.length === 1 ? "genre" : "genres"}
+                        </span>
+                    </h1>
 
-            <div className="carousel-container">
-                <div className="smaller-card-container-categories">
-                    {genres.map((genre, index) => (
-                        <div
-                            key={genre}
-                            className="smaller-card"
-                            tabIndex={0}
-                            data-genre={genre}
-                            ref={(el) => {
-                                cardRefs.current[index] = el;
-                            }}
-                            onClick={() => openGenre(genre)}
-                        >
-                            {genre}
+                    {loading && (
+                        <div className="empty-state" aria-live="polite">
+                            <p>Loading genres…</p>
                         </div>
-                    ))}
-                </div>
-            </div>
+                    )}
+
+                    {error && (
+                        <div className="error-state" role="alert">
+                            <h2 className="error-state-title">
+                                Couldn&apos;t load your library
+                            </h2>
+                            <button
+                                type="button"
+                                className="btn btn-primary"
+                                onClick={() => window.location.reload()}
+                            >
+                                Retry
+                            </button>
+                        </div>
+                    )}
+
+                    {!loading && !error && genres.length === 0 && (
+                        <div className="empty-state">
+                            <div className="empty-state-icon" aria-hidden="true">
+                                🎬
+                            </div>
+                            <h2 className="empty-state-title">No genres yet</h2>
+                            <p className="empty-state-text">
+                                Add titles to your library to see genres here.
+                            </p>
+                        </div>
+                    )}
+
+                    <div className="genre-grid">
+                        {genres.map((genre, index) => (
+                            <button
+                                key={genre}
+                                type="button"
+                                className="genre-pill"
+                                data-genre={genre}
+                                ref={(el) => {
+                                    cardRefs.current[index] = el;
+                                }}
+                                onClick={() => openGenre(genre)}
+                            >
+                                {genre}
+                            </button>
+                        ))}
+                    </div>
+                </section>
+            </main>
         </>
     );
 }

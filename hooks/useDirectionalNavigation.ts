@@ -169,13 +169,8 @@ export function useDirectionalNavigation(options: NavigationOptions = {}) {
                 (e) => e.el && document.contains(e.el),
             );
             const current = entries.find((entry) => entry.el === active);
-            if (
-                ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(
-                    e.key,
-                )
-            ) {
-                e.preventDefault();
-            }
+            // Only swallow arrow keys when a registered element is focused,
+            // otherwise page scrolling and native input behavior break.
             if (!current) return;
 
             let next: FocusableElement | null = null;

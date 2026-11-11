@@ -6,11 +6,13 @@ import PlayerPage from "./PlayerPage";
 import LoginPage from "./LoginPage";
 import { AuthProvider } from "./AuthProvider";
 import { ContentProvider } from "./ContentProvider";
+import { WishlistProvider } from "./WatchlistProvider";
 
 export default function App() {
     return (
         <AuthProvider>
-            <ContentProvider>
+            <WishlistProvider>
+                <ContentProvider>
                 <BrowserRouter>
                     <Routes>
                         <Route path="/" element={<HomePage />} />
@@ -22,7 +24,8 @@ export default function App() {
                         <Route path="/login" element={<LoginPage />} />
                     </Routes>
                 </BrowserRouter>
-            </ContentProvider>
+                </ContentProvider>
+            </WishlistProvider>
         </AuthProvider>
     );
 }

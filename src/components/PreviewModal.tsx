@@ -1,6 +1,15 @@
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { ContentItem } from "../../config";
+import { ContentItem, formatRuntime } from "../../config";
+
+interface Props {
+    item: ContentItem;
+    onClose: () => void;
+    wishlist: string[];
+    toggleWishlist: (id: string) => void;
+    registerModal: (el: HTMLElement | null) => void;
+    focusFirstModal: () => void;
+}
 
 export default function PreviewModal({
     item,
@@ -9,79 +18,107 @@ export default function PreviewModal({
     toggleWishlist,
     registerModal,
     focusFirstModal,
-}: {
-    item: ContentItem;
-    onClose: () => void;
-    wishlist: string[];
-    toggleWishlist: (id: string) => void;
-    registerModal: (el: HTMLElement | null) => void;
-    focusFirstModal: () => void;
-}) {
+}: Props) {
     const navigate = useNavigate();
+    const wished = wishlist.includes(item.id);
 
     useEffect(() => {
         focusFirstModal();
+    }, []);
+
+    // Global Escape so closing works even when focus moved off the dialog.
+    useEffect(() => {
+        const onKeyDown = (e: KeyboardEvent) => {
+            if (e.key === "Escape") onClose();
+        };
+        window.addEventListener("keydown", onKeyDown);
+        return () => window.removeEventListener("keydown", onKeyDown);
+    }, [onClose]);
+
+    // Lock page scroll behind the dialog.
+    useEffect(() => {
+        document.body.classList.add("modal-open");
+        return () => document.body.classList.remove("modal-open");
     }, []);
 
     const handlePlay = () => {
         navigate(`/player/${item.id}`);
     };
 
-  return (
-    <div id="preview-modal" className="active">
-      <div id="preview-content">
-
-        <button
-          ref={registerModal}
-          id="close-preview"
-          onClick={onClose}
+    return (
+        <div
+            className="modal-overlay active"
+            onClick={onClose}
+            role="presentation"
         >
-          ✖
-        </button>
+            <div
+                id="preview-content"
+                className="modal-panel"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="preview-name"
+                onClick={(e) => e.stopPropagation()}
+            >
+                <button
+                    type="button"
+                    ref={registerModal}
+                    id="close-preview"
+                    className="modal-close"
+                    onClick={onClose}
+                    aria-label="Close preview"
+                >
+                    ✕
+                </button>
 
+                <img
+                    id="preview-image"
+                    className="modal-poster"
+                    src={item.poster ?? "./content-info/poster/default.jpg"}
+                    alt={item.name}
+                />
 
-        <img
-          id="preview-image"
-          src={item.poster ?? "./content-info/poster/default.jpg"}
-          alt={item.name}
-        />
+                <h2 id="preview-name" className="modal-title">
+                    {item.name}
+                </h2>
 
+                <p className="modal-meta">
+                    {formatRuntime(item)}
+                    {item.releaseYear ? ` · ${item.releaseYear}` : ""}
+                </p>
 
-        <h3 id="preview-name">{item.name}</h3>
+                <p id="preview-description" className="modal-description">
+                    {item.description}
+                </p>
 
-
-        <p id="preview-description">{item.description}</p>
-
-
-        {item.seasons === null ? (
-          <p id="preview-duration">Duration: {item.duration} min</p>
-        ) : (
-          <p id="preview-seasons-episodes">
-            Seasons: {item.seasons} | Episodes: {item.episodes}
-          </p>
-        )}
-
-
-        {item.available ? (
-          <button
-            ref={registerModal}
-            id="play-button"
-            onClick={handlePlay}
-          >
-            Play
-          </button>
-        ) : (
-          <button
-            ref={registerModal}
-            id="add-to-wishlist"
-            onClick={() => toggleWishlist(item.id)}
-          >
-            {wishlist.includes(item.id)
-              ? "Remove from wishlist"
-              : "Add to wishlist"}
-          </button>
-        )}
-      </div>
-    </div>
-  );
+                <div className="modal-actions">
+                    {item.available ? (
+                        <button
+                            type="button"
+                            ref={registerModal}
+                            id="play-button"
+                            className="btn btn-primary"
+                            onClick={handlePlay}
+                        >
+                            ▶ Play
+                        </button>
+                    ) : (
+                        <button
+                            type="button"
+                            ref={registerModal}
+                            id="add-to-wishlist"
+                            className={`btn ${
+                                wished ? "btn-ghost" : "btn-primary"
+                            }`}
+                            aria-pressed={wished}
+                            onClick={() => toggleWishlist(item.id)}
+                        >
+                            {wished
+                                ? "✓ In wishlist — remove"
+                                : "♡ Add to wishlist"}
+                        </button>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
 }

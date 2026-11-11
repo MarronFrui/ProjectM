@@ -1,31 +1,43 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from '../supabase';
+import { useAuth } from "./AuthProvider";
 
 export default function LoginPage() {
-    const [username, setUsername] = useState("");
+    const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [error, setError] = useState("");
     const [loading, setLoading] = useState(false);
     const navigate = useNavigate();
+    const { user } = useAuth();
+
+    // Already signed in? The login form has nothing to offer.
+    useEffect(() => {
+        if (user) navigate("/", { replace: true });
+    }, [user]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setError("");
         setLoading(true);
 
-        const { data, error } = await supabase.auth.signInWithPassword({
-            email: username,
-            password: password,
-        });
+        try {
+            const { data, error: signInError } =
+                await supabase.auth.signInWithPassword({
+                    email: email.trim(),
+                    password,
+                });
 
-        if (error) {
-            setError(error.message);
-        } else if (data.session) {
-            navigate("/");
+            if (signInError) {
+                setError(signInError.message);
+            } else if (data.session) {
+                navigate("/");
+            }
+        } catch {
+            setError("Something went wrong. Please try again.");
+        } finally {
+            setLoading(false);
         }
-
-        setLoading(false);
     };
 
     return (
@@ -40,34 +52,53 @@ export default function LoginPage() {
                     <h2 className="login-heading">Sign in</h2>
                     <form onSubmit={handleSubmit} className="login-form">
                         <div className="login-field">
-                            <label className="login-label">Username</label>
+                            <label
+                                className="login-label"
+                                htmlFor="login-email"
+                            >
+                                Email
+                            </label>
                             <input
-                                type="text"
-                                value={username}
-                                onChange={(e) => setUsername(e.target.value)}
-                                autoComplete="username"
+                                id="login-email"
+                                type="email"
+                                value={email}
+                                onChange={(e) => setEmail(e.target.value)}
+                                autoComplete="email"
+                                autoFocus
                                 required
                                 className="login-input"
+                                placeholder="you@example.com"
                             />
                         </div>
                         <div className="login-field">
-                            <label className="login-label">Password</label>
+                            <label
+                                className="login-label"
+                                htmlFor="login-password"
+                            >
+                                Password
+                            </label>
                             <input
+                                id="login-password"
                                 type="password"
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
                                 autoComplete="current-password"
                                 required
                                 className="login-input"
+                                placeholder="••••••••"
                             />
                         </div>
-                        {error && <p className="login-error">{error}</p>}
+                        {error && (
+                            <p className="login-error" role="alert">
+                                {error}
+                            </p>
+                        )}
                         <button
                             type="submit"
                             disabled={loading}
                             className={`login-btn-submit ${loading ? "login-btn-loading" : ""}`}
                         >
-                            {loading ? "Signing in..." : "Sign in"}
+                            {loading ? "Signing in…" : "Sign in"}
                         </button>
                     </form>
                 </div>

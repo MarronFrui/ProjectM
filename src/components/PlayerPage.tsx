@@ -1,21 +1,10 @@
 import { useParams, useNavigate } from "react-router-dom";
 import { useEffect, useLayoutEffect, useState, useRef, useCallback } from "react";
-import { ContentItem } from "../../config";
+import { ContentItem, formatRuntime } from "../../config";
 import { useDirectionalNavigation } from "../../hooks/useDirectionalNavigation";
 import { useContent } from "./ContentProvider";
 import Plyr from "plyr";
 import ASS from "assjs";
-
-interface AudioTrack {
-    track: number;
-    language: string;
-    title: string;
-    codec: string;
-}
-
-interface Tracks {
-    audio: AudioTrack[];
-}
 
 interface ExternalSubtitle {
     lang: string;
@@ -183,7 +172,14 @@ function organizeBySeasons(videos: string[]): SeasonInfo[] {
         });
 
     const seasonsMap = new Map<number, SeasonInfo>();
+    // Filenames like `S01E63` and `S01E063` both resolve to the same episode;
+    // keep the first occurrence so the episode list shows no duplicates.
+    const seenEpisodes = new Set<string>();
     for (const ep of episodes) {
+        const episodeKey = `${ep.season}-${ep.episode}`;
+        if (seenEpisodes.has(episodeKey)) continue;
+        seenEpisodes.add(episodeKey);
+
         if (!seasonsMap.has(ep.season)) {
             seasonsMap.set(ep.season, { season: ep.season, episodes: [] });
         }
@@ -195,15 +191,12 @@ function organizeBySeasons(videos: string[]): SeasonInfo[] {
 
 export default function PlayerPage() {
     const { id, file } = useParams();
-    const { content } = useContent();
+    const { content, loading } = useContent();
     const [item, setItem] = useState<ContentItem | null>(null);
     const [seasons, setSeasons] = useState<SeasonInfo[]>([]);
     const [selectedSeason, setSelectedSeason] = useState<number | null>(null);
     const [selectedVideo, setSelectedVideo] = useState<string | null>(null);
-    const [audioTracks, setAudioTracks] = useState<Tracks | null>(null);
     const [subtitleTracks, setSubtitleTracks] = useState<ExternalSubtitle[]>([]);
-    const [selectedAudio, setSelectedAudio] = useState("0");
-    const [showTrackMenu, setShowTrackMenu] = useState(false);
     const navigate = useNavigate();
     const { register, focusFirst } = useDirectionalNavigation();
     const videoRef = useRef<HTMLVideoElement>(null);
@@ -262,10 +255,10 @@ export default function PlayerPage() {
         assInstancesRef.current.forEach(a => a.destroy());
         assInstancesRef.current.clear();
 
-        fetch(`${API_BASE}/api/tracks/${id}?file=${fileParam}`)
-            .then((r) => r.json())
-            .then((t) => setAudioTracks(t))
-            .catch(console.error);
+        // Clear last episode's tracks up front so they never leak into the
+        // next episode's <video> element.
+        setSubtitleTracks([]);
+        subtitleTracksRef.current = [];
 
         fetch(`${API_BASE}/api/subtitles-available/${id}?file=${fileParam}`)
             .then((r) => r.json())
@@ -460,14 +453,45 @@ export default function PlayerPage() {
             video.removeEventListener("canplay", handleCanPlay);
             if (onCaptionsDisabled) video.removeEventListener('captionsdisabled', onCaptionsDisabled);
         };
-    }, [item, selectedAudio, selectedVideo]);
+    }, [item, selectedVideo]);
 
     const containerKey = `${id}-${selectedVideo}`;
 
-    if (!item) return <div>Loading...</div>;
+    if (!item) {
+        return (
+            <div className="page">
+                <button
+                    type="button"
+                    className="back-btn"
+                    tabIndex={0}
+                    onClick={() => navigate("/")}
+                >
+                    ← Back
+                </button>
+                {loading ? (
+                    <div className="player-loading">
+                        <div className="spinner" role="status" aria-label="Loading" />
+                        <p>Loading title…</p>
+                    </div>
+                ) : (
+                    <div className="error-state">
+                        <h2 className="error-state-title">Title not found</h2>
+                        <p>This title is no longer in your library.</p>
+                        <button
+                            type="button"
+                            className="btn btn-primary"
+                            onClick={() => navigate("/")}
+                        >
+                            Back to browse
+                        </button>
+                    </div>
+                )}
+            </div>
+        );
+    }
 
     const fileParam = selectedVideo ? encodeURIComponent(selectedVideo) : "";
-    const streamUrl = `${API_BASE}/stream/${id}?audio=${selectedAudio}${selectedVideo ? `&file=${fileParam}` : ""}`;
+    const streamUrl = `${API_BASE}/stream/${id}${selectedVideo ? `?file=${fileParam}` : ""}`;
 
     const currentSeason = seasons.find((s) => s.season === selectedSeason);
 
@@ -484,16 +508,24 @@ export default function PlayerPage() {
     };
 
     return (
-        <>
+        <div className="page">
             <button
-                id="back-button"
+                type="button"
+                className="back-btn"
                 tabIndex={0}
                 ref={(el) => register(undefined, el, 0, 0)}
                 onClick={() => navigate(-1)}
             >
                 ← Back
             </button>
-            <h2>{item.name}</h2>
+
+            <header className="player-header">
+                <h1 className="player-title">{item.name}</h1>
+                <p className="player-meta">
+                    {formatRuntime(item)}
+                    {item.releaseYear ? ` · ${item.releaseYear}` : ""}
+                </p>
+            </header>
 
             {item.available ? (
                 <div className="videoplayer-container" key={containerKey}>
@@ -514,7 +546,16 @@ export default function PlayerPage() {
                     </div>
                 </div>
             ) : (
-                <p style={{ marginLeft: "2rem" }}>No media file available.</p>
+                <div className="empty-state">
+                    <div className="empty-state-icon" aria-hidden="true">
+                        📼
+                    </div>
+                    <h2 className="empty-state-title">No media file available</h2>
+                    <p className="empty-state-text">
+                        This title hasn&apos;t been added to the media library
+                        yet. Add it to your wishlist to get notified.
+                    </p>
+                </div>
             )}
 
             {isTvShow &&
@@ -522,14 +563,22 @@ export default function PlayerPage() {
                 selectedSeason !== null &&
                 currentSeason && (
                     <div className="season-selector">
-                        <div className="season-buttons">
+                        <div
+                            className="season-buttons"
+                            role="group"
+                            aria-label="Seasons"
+                        >
                             {seasons.map((s) => (
                                 <button
                                     key={s.season}
+                                    type="button"
                                     className={
                                         selectedSeason === s.season
                                             ? "active"
                                             : ""
+                                    }
+                                    aria-pressed={
+                                        selectedSeason === s.season
                                     }
                                     onClick={() => handleSeasonSelect(s.season)}
                                 >
@@ -539,56 +588,30 @@ export default function PlayerPage() {
                         </div>
                         <div className="episode-list">
                             <h4>Season {selectedSeason}</h4>
-                            {currentSeason.episodes.map((ep) => (
-                                <button
-                                    key={ep.filePath}
-                                    className={
-                                        selectedVideo === ep.filePath
-                                            ? "active"
-                                            : ""
-                                    }
-                                    onClick={() => handleEpisodeSelect(ep)}
-                                >
-                                    {ep.label}
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-                )}
-
-            {(audioTracks?.audio.length ?? 0) > 1 && (
-                <div className="track-selector">
-                    <button onClick={() => setShowTrackMenu(!showTrackMenu)}>
-                        ⚙️ Audio
-                    </button>
-                    {showTrackMenu && (
-                        <div className="track-menu">
-                            <div className="track-group">
-                                <h4>Audio</h4>
-                                {audioTracks?.audio.map((t) => (
-                                    <label key={t.track}>
-                                        <input
-                                            type="radio"
-                                            name="audio"
-                                            value={t.track}
-                                            checked={
-                                                selectedAudio ===
-                                                String(t.track)
-                                            }
-                                            onChange={() =>
-                                                setSelectedAudio(
-                                                    String(t.track),
-                                                )
-                                            }
-                                        />
-                                        {t.title} ({t.language})
-                                    </label>
+                            <div className="episode-grid">
+                                {currentSeason.episodes.map((ep) => (
+                                    <button
+                                        key={ep.filePath}
+                                        type="button"
+                                        className={
+                                            selectedVideo === ep.filePath
+                                                ? "active"
+                                                : ""
+                                        }
+                                        aria-pressed={
+                                            selectedVideo === ep.filePath
+                                        }
+                                        onClick={() =>
+                                            handleEpisodeSelect(ep)
+                                        }
+                                    >
+                                        {ep.label}
+                                    </button>
                                 ))}
                             </div>
                         </div>
-                    )}
-                </div>
-            )}
-        </>
+                    </div>
+                )}
+        </div>
     );
 }

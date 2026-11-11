@@ -115,29 +115,29 @@ portability or "fix" them as if they were bugs:
 - [x] ~~Add `.env.local` / `.env.*.local` to `.gitignore`~~ — fixed 2026-08-14
 - [ ] TMDB API key leaks into logs on fetch failure (`scraper.ts:49` includes `?api_key=` in the error URL)
 - [ ] `.env.production` defines `API_URL` but `PlayerPage.tsx:39` reads `VITE_URL` → player broken in prod builds; unify env var names + validate at startup
-- [ ] Wishlist is dead: `WatchlistProvider` never mounted, `WishlistPage` always empty; mount the provider or delete the feature. Additionally, `HomePage.tsx` keeps its own local `wishlist` state and passes it to `CardsGrid`/`PreviewModal`, so toggles are lost on navigation and are not shared with `WishlistPage` even if the provider were mounted
+- [x] ~~Wishlist is dead: `WatchlistProvider` never mounted; local wishlist state lost on navigation~~ — fixed 2026-11-11: `WishlistProvider` mounted in `App.tsx`, new `useWishlist()` hook shared by `HomePage`/`WishlistPage` (optimistic toggle with revert on failure). WishlistPage now opens the preview modal on card select and shows an empty state
 - [ ] Auth gates nothing: no route checks `useAuth()`; protect routes or drop the login flow
 
 ### Medium
 
-- [ ] Audio-track selection is **dropped** but the code is still live and must be stripped: `PlayerPage.tsx` keeps `selectedAudio` state, renders the audio menu (lines 430-450) and appends `?audio=N` to the stream URL — which the server **ignores** (`/stream/:id` never reads it; the original file streams as-is, so the browser always plays the default audio track). Switching tracks also destroys Plyr without recreating it. Remove the menu/state/param (optionally keep `/api/tracks/:id` ffprobe listing for a future remux-based implementation)
+- [x] ~~Audio-track selection is dropped but the code is still live~~ — fixed 2026-11-11: menu/state/`?audio=` param and the `/api/tracks/:id` fetch stripped from `PlayerPage.tsx` (`/api/tracks/:id` endpoint still exists server-side for a future remux-based implementation)
 - [ ] Range handling (`server.js:350-363`): clamp `end` to `fileSize-1`, return 416 for invalid/suffix ranges, use per-extension `Content-Type` (not hardcoded `video/mp4`)
 - [ ] Route shadowing: `/media/:id` registered before `express.static` (`server.js:241` vs 272) — reorder/reconcile
 - [ ] Subtitle matching bugs: ~~unpadded `S1E2` never matches~~ — fixed 2026-07-26: sub-file ↔ video episode comparison now goes through `normalizeEpisodeId()` (numeric, padding-insensitive) and `SxxEyy` regexes accept 3-digit episodes (`S01E001`) in `server.js`, `PlayerPage.tsx`, `extract-subtitles.ts`. Remaining: `NNxNN` filenames unparsed; `(year)` in folder names breaks OpenSubtitles filtering; case-sensitive `.ass`/`.vtt` checks; episode-less sub files served for every episode
 - [ ] Fuzzy `matches()` (60% word overlap, first-match-wins) mismatches one-word titles nondeterministically (`server.js:102-111`)
-- [ ] Stale subtitle `<track>`s leak into next episode's `<video>` — reset `subtitleTracks`/`audioTracks` in effect cleanup (`PlayerPage.tsx:258-262`)
+- [x] ~~Stale subtitle `<track>`s leak into next episode's `<video>`~~ — fixed 2026-11-11: `subtitleTracks`/`subtitleTracksRef` reset at the start of the load effect
 - [ ] Item-load effect has no race guard or error handling (`PlayerPage.tsx:156-178`)
-- [ ] Directional nav `preventDefault()`s all arrow keys before checking focus — breaks page scroll & radio inputs (`useDirectionalNavigation.ts:172-179`)
-- [ ] CardsGrid: virtualization range never shrinks → blank grid after category switch; search-after-scroll registers shifted col indices (`CardsGrid.tsx:38-72`)
+- [x] ~~Directional nav `preventDefault()`s all arrow keys before checking focus~~ — fixed 2026-11-11: arrow keys are only swallowed when a registered grid element is focused
+- [x] ~~CardsGrid: blank grid after category switch; search-after-scroll registers shifted col indices~~ — fixed 2026-11-11: range resets whenever `items` changes, and search mode renders all items with absolute col indices; HomePage memoizes the filtered arrays so the reset isn't a re-render loop
 - [ ] Scripts: shell-injection-prone path interpolation (`extract-subtitles.ts:97,205,212`, `sync-subtitles.ts:82,105`, `convert-videos.ts:58-60`); convert-videos re-encodes already-h264 video lossily (use `-c:v copy` when possible)
-- [ ] Relative `href="style.css"` breaks on nested routes (`index.html:7` → `/style.css`); Plyr CSS loaded from CDN instead of the installed npm package
+- [x] ~~Relative `href="style.css"` breaks on nested routes; Plyr CSS loaded from CDN~~ — fixed 2026-11-11: `/style.css` absolute, Plyr CSS imported from the installed `plyr` package in `index.tsx`
 - [ ] No typecheck ever runs (`typescript` not installed, no script); strict-mode errors already exist (e.g. `convert-videos.ts:70-71`)
 
 ### Low
 
 - [x] ~~`npm test` placeholder always fails; `"preview"` rebuilds instead of `vite preview`; `"main": "index.js"` nonexistent~~ — fixed 2026-08-14
 - [ ] unused `jsdom` deps
-- [ ] `LoginPage` sends "Username" text field as `email:`; no redirect away from `/login` when authenticated
+- [x] ~~`LoginPage` sends "Username" text field as `email:`; no redirect away from `/login` when authenticated~~ — fixed 2026-11-11: field relabelled "Email" (`type="email"`, `autoComplete="email"`), labels associated via `htmlFor`, error announced via `role="alert"`, authenticated users redirected to `/`
 - [ ] No fetch timeouts (server + frontend); unbounded `episodeNameCache`; OpenSubtitles download tokens logged; JSON errors served as `Content-Type: text/vtt`
 - [ ] `parseEpisodeFromPath` fabricates "S1E1" for unmatched files; ASS subtitles fetched twice; `navigate(-1)` back buttons break on direct loads
 - [ ] README is empty
