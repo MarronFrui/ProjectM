@@ -452,7 +452,10 @@ body.modal-open {
     margin: -1.5rem -0.75rem;
     overflow-x: auto;
     overflow-y: hidden;
-    scroll-snap-type: x proximity;
+    /* Focus reveals (arrow-key navigation) keep this clearance from the
+       scrollport edges, so a focused card and its ring are always fully
+       visible — no scroll-snap needed to settle the row. */
+    scroll-padding-inline: 1rem;
     scrollbar-width: none;
 }
 
@@ -468,7 +471,6 @@ body.modal-open {
     cursor: pointer;
     user-select: none;
     -webkit-user-select: none;
-    scroll-snap-align: start;
     transition:
         transform var(--duration-base) var(--ease-out),
         box-shadow var(--duration-base) var(--ease-out);
