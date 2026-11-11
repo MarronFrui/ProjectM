@@ -442,10 +442,14 @@ body.modal-open {
     grid-auto-flow: column;
     grid-auto-columns: clamp(9rem, 12.5vw, 12rem);
     gap: 1rem;
-    /* Side padding must fit the focus ring (3px outline + 2px offset);
-       the negative margin keeps the cards aligned with the section title. */
-    padding: 1.5rem 0.5rem;
-    margin: 0 -0.25rem;
+    /* overflow-x: auto forces the other axis to clip at the padding edge,
+       so the padding here must fully contain every ink overflow (focus
+       ring, hover scale, and the 32px hover shadow ~44px tall) — that is
+       what makes the row behave as if overflow were visible. The negative
+       margins keep the cards aligned with the section titles and the
+       layout footprint unchanged. */
+    padding: 3rem 1rem;
+    margin: -1.5rem -0.75rem;
     overflow-x: auto;
     overflow-y: hidden;
     scroll-snap-type: x proximity;
