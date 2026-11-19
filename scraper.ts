@@ -1,10 +1,18 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { Buffer } from "node:buffer";
-import keyConfig from "./apikey.json" with { type: "json" };
 import { ContentItem } from "./config";
 
-const API_KEY = keyConfig.API_KEY;
+// TMDB key lives in .env (TMDB_API_KEY=...), same file the server parses
+const API_KEY =
+    process.env.TMDB_API_KEY ??
+    fs
+        .readFileSync(new URL("./.env", import.meta.url), "utf-8")
+        .split("\n")
+        .find((line) => line.startsWith("TMDB_API_KEY="))
+        ?.slice("TMDB_API_KEY=".length)
+        .trim() ??
+    "";
 const BASE_URL = "https://api.themoviedb.org/3";
 
 const POSTER_DIR = "./content-info/poster";

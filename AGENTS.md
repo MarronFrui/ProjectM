@@ -81,10 +81,8 @@ The wishlist is device-local: `WatchlistProvider` persists it to
 ## Environment & secrets (never commit)
 
 - `.env` / `.env.production`: `VITE_API_URL`, `VITE_URL`,
-  `OPENSUBTITLES_API_KEY`. `.env.production` also defines `API_URL`, which
-  nothing reads.
-- `apikey.json`: TMDB key — used by `scraper.ts` and `src/server.js`
-- `apikeyOMDb.json`: OMDb key — currently read by nothing
+  `OPENSUBTITLES_API_KEY`, `TMDB_API_KEY`, `OMDB_API_KEY`. `.env.production`
+  also defines `API_URL`, which nothing reads.
 
 ## Deployment
 
