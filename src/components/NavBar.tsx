@@ -1,5 +1,4 @@
-import { NavLink, useNavigate } from "react-router-dom";
-import { useAuth } from "./AuthProvider";
+import { NavLink } from "react-router-dom";
 import { FocusableElement } from "../../hooks/useDirectionalNavigation";
 
 interface Props {
@@ -34,10 +33,7 @@ const SearchIcon = () => (
  * links live in row 0, ahead of the card grid rows.
  */
 export default function NavBar({ register, search, onSearchChange }: Props) {
-    const navigate = useNavigate();
-    const { user, signOut } = useAuth();
     const hasSearch = onSearchChange !== undefined;
-    const authCol = hasSearch ? 4 : 3;
 
     const clearSearch = () => {
         onSearchChange?.("");
@@ -105,26 +101,6 @@ export default function NavBar({ register, search, onSearchChange }: Props) {
                             </button>
                         )}
                     </div>
-                )}
-
-                {user ? (
-                    <button
-                        type="button"
-                        className="btn btn-ghost"
-                        onClick={signOut}
-                        ref={(el) => register("nav-auth", el, 0, authCol)}
-                    >
-                        Logout
-                    </button>
-                ) : (
-                    <button
-                        type="button"
-                        className="btn btn-primary"
-                        onClick={() => navigate("/login")}
-                        ref={(el) => register("nav-auth", el, 0, authCol)}
-                    >
-                        Login
-                    </button>
                 )}
             </div>
         </nav>
