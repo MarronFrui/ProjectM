@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
-import { loadContentDB, ContentItem } from "../../config";
+import { loadContentDB, ContentItem } from "../server/config";
 
 interface ContentContextValue {
     content: ContentItem[];

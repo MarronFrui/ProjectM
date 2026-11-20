@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from "react";
-import { ContentItem } from "../../config";
+import { ContentItem } from "../server/config";
 import Card from "./Card";
 
 const CARD_ROWS = 2;

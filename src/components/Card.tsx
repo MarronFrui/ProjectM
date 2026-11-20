@@ -1,4 +1,4 @@
-import { ContentItem, formatRuntime } from "../../config";
+import { ContentItem, formatRuntime } from "../server/config";
 import { forwardRef, KeyboardEvent } from "react";
 
 interface Props {

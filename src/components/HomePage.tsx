@@ -1,6 +1,6 @@
 import { useParams, useNavigate } from "react-router-dom";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ContentItem } from "../../config";
+import { ContentItem } from "../server/config";
 import CardsGrid from "./CardsGrid";
 import PreviewModal from "./PreviewModal";
 import NavBar from "./NavBar";

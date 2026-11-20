@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { ContentItem, formatRuntime } from "../../config";
+import { ContentItem, formatRuntime } from "../server/config";
 
 interface Props {
     item: ContentItem;

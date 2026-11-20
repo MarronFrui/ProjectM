@@ -1,6 +1,6 @@
 import { useParams, useNavigate } from "react-router-dom";
 import { useEffect, useLayoutEffect, useState, useRef, useCallback } from "react";
-import { ContentItem, formatRuntime } from "../../config";
+import { ContentItem, formatRuntime } from "../server/config";
 import { useDirectionalNavigation } from "../../hooks/useDirectionalNavigation";
 import { useContent } from "./ContentProvider";
 import Plyr from "plyr";
